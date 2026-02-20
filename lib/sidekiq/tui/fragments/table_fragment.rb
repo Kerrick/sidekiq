@@ -4,10 +4,16 @@ module Sidekiq
   module TUI
     # Reusable nested fragment for table navigation and selection.
     # Parent tabs compose via `route :table, to: TableFragment` and
-    # forward navigation events. Parents own the raw data and format
-    # rows for display; the table handles cursor + selection state.
+    # `otherwise route_to: :table`. Navigation events are handled by
+    # the table's Router; everything else is wrapped with the current
+    # selection and bubbled outward as `ActionRequested`.
     module TableFragment
       include Rooibos::Router
+
+      # Bubbled outward when the table receives a message it doesn't handle.
+      class ActionRequested < Data.define(:envelope, :action, :ids)
+        include Rooibos::Message::Predicates
+      end
 
       class Model < Data.define(:row_ids, :selected, :selected_row_index)
         def selected?(id) = selected.include?(id)
@@ -44,9 +50,18 @@ module Sidekiq
         model.with(selected: new_selected)
       }
 
-      Update = from_router
+      # Anything the table doesn't handle as navigation gets wrapped
+      # with the current selection and bubbled outward. The parent
+      # intercepts ActionRequested and dispatches domain-specific commands.
+      receive_all ->(message, model) {
+        ids = model.action_ids
+        return model if ids.empty?
+        action = message.respond_to?(:envelope) ? message.envelope : message
+        cleared = model.with(selected: [], selected_row_index: 0)
+        [cleared, Rooibos::Command.bubble(ActionRequested.new(envelope: :table, action:, ids:))]
+      }
 
-      ClearSelection = ->(model) { model.with(selected: [], selected_row_index: 0) }
+      Update = from_router
 
       # --- View: renders table widget with configuration from parent ---
 

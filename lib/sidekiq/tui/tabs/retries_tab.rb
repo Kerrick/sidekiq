@@ -25,9 +25,14 @@ module Sidekiq
 
       View = SetBehavior::RenderSetTable
 
-      receive_routed :delete, ->(_, model) { SetBehavior::MakeAlterCommand[model, :delete] }
-      receive_routed :retry,  ->(_, model) { SetBehavior::MakeAlterCommand[model, :retry] }
-      receive_routed :kill,   ->(_, model) { SetBehavior::MakeAlterCommand[model, :kill] }
+      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        case message.action
+        when :delete then [model, SetBehavior::MakeAlterCommand[model, :delete, message.ids]]
+        when :retry  then [model, SetBehavior::MakeAlterCommand[model, :retry, message.ids]]
+        when :kill   then [model, SetBehavior::MakeAlterCommand[model, :kill, message.ids]]
+        else model
+        end
+      }
 
       receive_instances_of RetriesFetched, SetBehavior::ApplySetData
 

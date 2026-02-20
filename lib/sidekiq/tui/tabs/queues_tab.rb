@@ -23,25 +23,19 @@ module Sidekiq
       }
 
       route :table, to: TableFragment
+      otherwise route_to: :table
 
-      forward_routed :row_down, to: :table
-      forward_routed :row_up, to: :table
-      forward_routed :toggle_select, to: :table
-      forward_routed :toggle_select_all, to: :table
-
-      receive_routed :delete_queue, ->(_, model) {
-        ids = model.table.action_ids
-        return model if ids.empty?
-        commands = ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
-        [model.with(table: TableFragment::ClearSelection[model.table]),
-         commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
-      }
-
-      receive_routed :toggle_pause, ->(_, model) {
-        ids = model.table.action_ids
-        return model if ids.empty?
-        commands = ids.map { |qname| TogglePauseQueue.new(queue_name: qname, tab: :queues) }
-        [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        case message.action
+        when :delete_queue
+          commands = message.ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
+          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        when :toggle_pause
+          commands = message.ids.map { |qname| TogglePauseQueue.new(queue_name: qname, tab: :queues) }
+          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        else
+          model
+        end
       }
 
       receive_instances_of QueuesFetched, ->(message, model) {

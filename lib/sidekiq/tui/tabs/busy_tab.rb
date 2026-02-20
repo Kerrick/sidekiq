@@ -26,23 +26,19 @@ module Sidekiq
       }
 
       route :table, to: TableFragment
+      otherwise route_to: :table
 
-      forward_routed :row_down, to: :table
-      forward_routed :row_up, to: :table
-      forward_routed :toggle_select, to: :table
-      forward_routed :toggle_select_all, to: :table
-
-      receive_routed :terminate, ->(_, model) {
-        commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
-        return model if commands.empty?
-        [model.with(table: TableFragment::ClearSelection[model.table]),
-         commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
-      }
-
-      receive_routed :quiet, ->(_, model) {
-        commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :quiet, tab: :busy) }
-        return model if commands.empty?
-        [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        case message.action
+        when :terminate
+          commands = message.ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
+          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        when :quiet
+          commands = message.ids.map { |id| SignalProcess.new(identity: id, signal: :quiet, tab: :busy) }
+          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        else
+          model
+        end
       }
 
       receive_instances_of ProcessesFetched, ->(message, model) {

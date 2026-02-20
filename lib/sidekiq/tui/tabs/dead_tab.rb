@@ -25,8 +25,13 @@ module Sidekiq
 
       View = SetBehavior::RenderSetTable
 
-      receive_routed :delete,  ->(_, model) { SetBehavior::MakeAlterCommand[model, :delete] }
-      receive_routed :enqueue, ->(_, model) { SetBehavior::MakeAlterCommand[model, :add_to_queue] }
+      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        case message.action
+        when :delete  then [model, SetBehavior::MakeAlterCommand[model, :delete, message.ids]]
+        when :enqueue then [model, SetBehavior::MakeAlterCommand[model, :add_to_queue, message.ids]]
+        else model
+        end
+      }
 
       receive_instances_of DeadFetched, SetBehavior::ApplySetData
 

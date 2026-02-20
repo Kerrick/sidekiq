@@ -15,12 +15,9 @@ module Sidekiq
 
       # --- Shared update logic ---
 
-      MakeAlterCommand = ->(model, action_name) {
-        ids = model.table.action_ids
-        return model if ids.empty?
-        command = AlterSetRows.new(set_class_name: model.set_class_name, ids: ids,
-                                   action_name:, tab: model.tab_name)
-        [model.with(table: TableFragment::ClearSelection[model.table]), command]
+      MakeAlterCommand = ->(model, action_name, ids) {
+        AlterSetRows.new(set_class_name: model.set_class_name, ids: ids,
+                         action_name:, tab: model.tab_name)
       }
 
       ApplySetData = ->(message, model) {
@@ -31,8 +28,6 @@ module Sidekiq
         )
         model.with(table: new_table, pager: new_pager, rows: message.rows)
       }
-
-      StartFilter = ->(_, model) { model.with(filtering: true, filter: "") }
 
       # --- Shared view rendering ---
 
@@ -62,13 +57,9 @@ module Sidekiq
       def self.included(base)
         base.module_eval do
           route :table, to: TableFragment
+          otherwise route_to: :table
 
-          forward_routed :row_down, to: :table
-          forward_routed :row_up, to: :table
-          forward_routed :toggle_select, to: :table
-          forward_routed :toggle_select_all, to: :table
-
-          receive_routed :start_filter, SetBehavior::StartFilter
+          receive_routed :start_filter, ->(_, model) { model.with(filtering: true, filter: "") }
 
           receive_routed :prev_page, ->(_, model) {
             return model if model.pager.page < 2
@@ -94,11 +85,11 @@ module Sidekiq
             }
 
             receive_events :enter, ->(_, model) {
-              model.with(filtering: false, table: TableFragment::ClearSelection[model.table])
+              model.with(filtering: false)
             }
 
             receive_events :esc, ->(_, model) {
-              model.with(filtering: false, filter: nil, table: TableFragment::ClearSelection[model.table])
+              model.with(filtering: false, filter: nil)
             }
           end
         end
