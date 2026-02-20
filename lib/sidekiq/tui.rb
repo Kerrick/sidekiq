@@ -142,22 +142,49 @@ module Sidekiq
 
     # --- Semantic key→message forwarding to active tab ---
 
+    class TabControl < Data.define(:key, :semantic, :display_key, :description); end
+
     SHARED_TABLE_KEYS = { j: :row_down, k: :row_up, x: :toggle_select, shift_A: :toggle_select_all,
                           h: :prev_page, l: :next_page }
+    SHARED_TABLE_DISPLAY = [["h/l", "Prev/Next Page"], ["j/k", "Prev/Next Row"],
+                            ["x", "Select"], ["A", "Select All"]]
+
+    BUSY_CONTROLS = [
+      TabControl.new(key: :shift_T, semantic: :terminate, display_key: "T", description: "Terminate"),
+      TabControl.new(key: :shift_Q, semantic: :quiet, display_key: "Q", description: "Quiet")
+    ]
+
+    QUEUES_CONTROLS = [
+      TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: "D", description: "Delete"),
+      TabControl.new(key: :p, semantic: :toggle_pause, display_key: "p", description: "Pause/Unpause")
+    ]
+
+    SET_CONTROLS = {
+      delete:  TabControl.new(key: :shift_D, semantic: :delete,  display_key: "D", description: "Delete"),
+      retry:   TabControl.new(key: :shift_R, semantic: :retry,   display_key: "R", description: "Retry"),
+      enqueue: TabControl.new(key: :shift_E, semantic: :enqueue, display_key: "E", description: "Enqueue"),
+      kill:    TabControl.new(key: :shift_K, semantic: :kill,     display_key: "K", description: "Kill"),
+      filter:  TabControl.new(key: :"/",     semantic: :start_filter, display_key: "/", description: "Filter")
+    }
+
+    SCHEDULED_CONTROLS = [SET_CONTROLS[:delete], SET_CONTROLS[:enqueue], SET_CONTROLS[:kill], SET_CONTROLS[:filter]]
+    RETRIES_CONTROLS   = [SET_CONTROLS[:delete], SET_CONTROLS[:retry], SET_CONTROLS[:kill], SET_CONTROLS[:filter]]
+    DEAD_CONTROLS      = [SET_CONTROLS[:delete], SET_CONTROLS[:enqueue], SET_CONTROLS[:filter]]
+
+    TAB_CONTROLS = { busy: BUSY_CONTROLS, queues: QUEUES_CONTROLS,
+                     scheduled: SCHEDULED_CONTROLS, retries: RETRIES_CONTROLS, dead: DEAD_CONTROLS }
 
     only when: ->(_, model) { model.active_tab == :busy } do
       route_to :busy do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        forward_events :shift_T, as: :terminate
-        forward_events :shift_Q, as: :quiet
+        BUSY_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
     only when: ->(_, model) { model.active_tab == :queues } do
       route_to :queues do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        forward_events :shift_D, as: :delete_queue
-        forward_events :p, as: :toggle_pause
+        QUEUES_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
@@ -168,33 +195,21 @@ module Sidekiq
     only when: SCHEDULED_NOT_FILTERING do
       route_to :scheduled do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        forward_events :shift_D, as: :delete
-        forward_events :shift_R, as: :retry
-        forward_events :shift_E, as: :enqueue
-        forward_events :shift_K, as: :kill
-        forward_events :"/", as: :start_filter
+        SCHEDULED_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
     only when: RETRIES_NOT_FILTERING do
       route_to :retries do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        forward_events :shift_D, as: :delete
-        forward_events :shift_R, as: :retry
-        forward_events :shift_E, as: :enqueue
-        forward_events :shift_K, as: :kill
-        forward_events :"/", as: :start_filter
+        RETRIES_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
     only when: DEAD_NOT_FILTERING do
       route_to :dead do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        forward_events :shift_D, as: :delete
-        forward_events :shift_R, as: :retry
-        forward_events :shift_E, as: :enqueue
-        forward_events :shift_K, as: :kill
-        forward_events :"/", as: :start_filter
+        DEAD_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
@@ -227,17 +242,8 @@ module Sidekiq
       common = [["?", "Help"], ["←/→", "Select Tab"], ["q", "Quit"]]
       return common if tab == :home || tab == :metrics
 
-      table_ctrls = [["h/l", "Prev/Next Page"], ["j/k", "Prev/Next Row"],
-                     ["x", "Select"], ["A", "Select All"]]
-      tab_ctrls = case tab
-        when :busy then [["T", "Terminate"], ["Q", "Quiet"]]
-        when :queues then [["D", "Delete"], ["p", "Pause/Unpause"]]
-        when :scheduled then [["D", "Delete"], ["E", "Enqueue"], ["K", "Kill"], ["/", "Filter"]]
-        when :retries then [["D", "Delete"], ["R", "Retry"], ["K", "Kill"], ["/", "Filter"]]
-        when :dead then [["D", "Delete"], ["E", "Enqueue"], ["/", "Filter"]]
-        else []
-      end
-      common + table_ctrls + tab_ctrls
+      tab_display = (TAB_CONTROLS[tab] || []).map { |control| [control.display_key, control.description] }
+      common + SHARED_TABLE_DISPLAY + tab_display
     }
 
     TAB_MODULES = {
