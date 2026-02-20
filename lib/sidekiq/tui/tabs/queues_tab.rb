@@ -2,30 +2,31 @@
 
 module Sidekiq
   module TUI
+    # Queues tab fragment. Model stores raw QueueData; View formats for display.
     module QueuesTab
       include Rooibos::Router
 
-      Model = Data.define(:table, :pro)
-      Init = -> { Ractor.make_shareable Model.new(table: EMPTY_TABLE, pro: false) }
+      Model = Data.define(:table, :queues, :pro)
+      Init = -> { Ractor.make_shareable Model.new(table: EMPTY_TABLE, queues: [], pro: false) }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [RenderStats[stats, tui], RenderQueues[model, tui]]
+          children: [Views::RenderStats[stats, tui], RenderQueues[model, tui]]
         )
       }
 
-      receive_routed :row_down, RowDown
-      receive_routed :row_up, RowUp
-      receive_routed :toggle_select, ToggleSelect
-      receive_routed :toggle_select_all, ToggleSelectAll
+      receive_routed :row_down, Actions::RowDown
+      receive_routed :row_up, Actions::RowUp
+      receive_routed :toggle_select, Actions::ToggleSelect
+      receive_routed :toggle_select_all, Actions::ToggleSelectAll
 
       receive_routed :delete_queue, ->(_, model) {
         ids = model.table.action_ids
         return model if ids.empty?
         commands = ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
-        [model.with(table: ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        [model.with(table: Actions::ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :toggle_pause, ->(_, model) {
@@ -36,24 +37,27 @@ module Sidekiq
       }
 
       receive_instances_of DataFetched, ->(message, model) {
-        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
-        model.with(table: new_table, pro: message.tab_data[:pro] || false)
+        queues = message.tab_data[:queues]
+        new_table = model.table.with(row_ids: queues.map(&:name))
+        model.with(table: new_table, queues: queues, pro: message.tab_data[:pro] || false)
       }
 
       Update = from_router
+
+      # --- View-layer formatting ---
 
       RenderQueues = ->(model, tui) {
         table = model.table
         header = ["☑️", "Queue", "Size", "Latency"]
         header << "Paused?" if model.pro
-        rows = table.rows.map.with_index { |cells, idx|
-          tui.table_row(
-            cells: [table.selected?(table.row_ids[idx]) ? "✅" : ""] + cells,
-            style: idx.even? ? nil : ALT_ROW_STYLE
-          )
+        rows = model.queues.map.with_index { |queue_data, idx|
+          cells = [table.selected?(queue_data.name) ? "✅" : "",
+                   queue_data.name, queue_data.size.to_s, queue_data.latency.to_s]
+          cells << (queue_data.paused ? "✅" : "") if model.pro
+          tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         }
         widths = header.map.with_index { |_, i| tui.constraint_length((i == 1) ? 60 : 10) }
-        RenderTableWidget[tui, table, title: "Queues", header: header, widths: widths, rows: rows]
+        Views::RenderTableWidget[tui, table, title: "Queues", header: header, widths: widths, rows: rows]
       }
     end
   end

@@ -15,7 +15,7 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [RenderStats[stats, tui], RenderChart[model, tui]]
+          children: [Views::RenderStats[stats, tui], RenderChart[model, tui]]
         )
       }
 

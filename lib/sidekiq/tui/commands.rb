@@ -22,18 +22,6 @@ module Sidekiq
         "N/A"
       end
 
-      def format_memory(rss_kb)
-        return "0" if rss_kb.nil? || rss_kb == 0
-
-        if rss_kb < 100_000
-          "#{rss_kb} KB"
-        elsif rss_kb < 10_000_000
-          "#{(rss_kb / 1024.0).to_i} MB"
-        else
-          "#{(rss_kb / (1024.0 * 1024.0)).round(1)} GB"
-        end
-      end
-
       # Single Ractor.make_shareable at the boundary.
       def emit(out, tab, stats, tab_data, redis_url)
         result = DataFetched.new(tab:, stats:, tab_data:, redis_url:)
@@ -67,7 +55,7 @@ module Sidekiq
       end
     end
 
-    # Fetches Busy tab data: process list and utilization status.
+    # Fetches Busy tab data: raw process data for the View to format.
     class FetchBusy < Data.define
       include Rooibos::Command::Custom
       include FetchStats
@@ -75,39 +63,25 @@ module Sidekiq
       def call(out, _token)
         stats = fetch_stats
         processes = []
-        row_ids = []
-        total_concurrency = 0
-        total_rss = 0
-        process_count = 0
 
         Sidekiq::ProcessSet.new.each do |process|
-          name = "#{process["hostname"]}:#{process["pid"]}"
-          name += " ⭐️" if process.leader?
-          name += " 🛑" if process.stopping?
-          processes << [name, Time.at(process["started_at"]).utc.to_s, format_memory(process["rss"].to_i),
-                        process["concurrency"].to_s, process["busy"].to_s]
-          row_ids << process.identity
-          total_concurrency += process["concurrency"].to_i
-          total_rss += process["rss"].to_i
-          process_count += 1
+          processes << ProcessData.new(
+            hostname: process["hostname"], pid: process["pid"],
+            started_at: Time.at(process["started_at"]).utc,
+            rss_kb: process["rss"].to_i, concurrency: process["concurrency"].to_i,
+            busy: process["busy"].to_i, identity: process.identity,
+            leader: process.leader?, stopping: process.stopping?
+          )
         end
 
         work_set_size = Sidekiq::WorkSet.new.size
-        utilization = (total_concurrency == 0) ? "0%" : "#{((work_set_size / total_concurrency.to_f) * 100).round(0)}%"
 
-        tab_data = {
-          rows: processes,
-          row_ids: row_ids,
-          status: BusyStatus.new(
-            processes: process_count.to_s, threads: total_concurrency.to_s,
-            busy: work_set_size.to_s, utilization: utilization, rss: format_memory(total_rss)
-          )
-        }
+        tab_data = { processes:, work_set_size: }
         emit(out, :busy, stats, tab_data, fetch_redis_url)
       end
     end
 
-    # Fetches Queues tab data: queue list with sizes and latencies.
+    # Fetches Queues tab data: raw queue objects for the View to format.
     class FetchQueues < Data.define
       include Rooibos::Command::Custom
       include FetchStats
@@ -116,14 +90,12 @@ module Sidekiq
         stats = fetch_stats
         queue_summaries = Sidekiq::Stats.new.queue_summaries.sort_by(&:name)
         pro = Sidekiq.pro?
-        rows = queue_summaries.map { |qs|
-          cells = [qs.name, qs.size.to_s, qs.latency.round(2).to_s]
-          cells << (qs.paused? ? "✅" : "") if pro
-          cells
-        }
-        row_ids = queue_summaries.map(&:name)
 
-        tab_data = { rows:, row_ids:, pro: }
+        queues = queue_summaries.map { |qs|
+          QueueData.new(name: qs.name, size: qs.size, latency: qs.latency.round(2), paused: pro && qs.paused?)
+        }
+
+        tab_data = { queues:, pro: }
         emit(out, :queues, stats, tab_data, fetch_redis_url)
       end
     end
@@ -217,7 +189,6 @@ module Sidekiq
       end
     end
 
-    # Clears a named queue.
     class ClearQueue < Data.define(:queue_name, :tab)
       include Rooibos::Command::Custom
 
@@ -227,22 +198,16 @@ module Sidekiq
       end
     end
 
-    # Toggles pause on a queue (Sidekiq Pro only).
     class TogglePauseQueue < Data.define(:queue_name, :tab)
       include Rooibos::Command::Custom
 
       def call(out, _token)
         queue = Sidekiq::Queue.new(queue_name)
-        if queue.paused?
-          queue.unpause!
-        else
-          queue.pause!
-        end
+        queue.paused? ? queue.unpause! : queue.pause!
         out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :toggle_pause)))
       end
     end
 
-    # Sends a signal to a Sidekiq process (quiet or terminate).
     class SignalProcess < Data.define(:identity, :signal, :tab)
       include Rooibos::Command::Custom
 

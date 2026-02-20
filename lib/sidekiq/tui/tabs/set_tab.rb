@@ -23,10 +23,10 @@ module Sidekiq
           tui.table_row(
             cells: [model.table.selected?(entry[:id]) ? "✅" : "",
                     entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
-            style: idx.even? ? nil : ALT_ROW_STYLE
+            style: idx.even? ? nil : Views::ALT_ROW_STYLE
           )
         }
-        table_widget = RenderTableWidget[tui, model.table,
+        table_widget = Views::RenderTableWidget[tui, model.table,
           title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager, filter_state: filter_state,
           header: ["☑️", "When", "Queue", "Job", "Arguments"],
           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
@@ -34,16 +34,16 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [RenderStats[stats, tui], table_widget]
+          children: [Views::RenderStats[stats, tui], table_widget]
         )
       }
 
       # --- Semantic messages from root ---
 
-      receive_routed :row_down, RowDown
-      receive_routed :row_up, RowUp
-      receive_routed :toggle_select, ToggleSelect
-      receive_routed :toggle_select_all, ToggleSelectAll
+      receive_routed :row_down, Actions::RowDown
+      receive_routed :row_up, Actions::RowUp
+      receive_routed :toggle_select, Actions::ToggleSelect
+      receive_routed :toggle_select_all, Actions::ToggleSelectAll
 
       receive_routed :prev_page, ->(_, model) {
         return model if model.pager.page < 2
@@ -75,7 +75,7 @@ module Sidekiq
         return model if ids.empty?
         command = AlterSetRows.new(set_class_name: model.set_class_name, ids: ids,
                                    action_name:, tab: model.tab_name)
-        [model.with(table: ClearSelection[model.table]), command]
+        [model.with(table: Actions::ClearSelection[model.table]), command]
       }
 
       receive_routed :delete,  ->(_, model) { MakeAlterCommand[model, :delete] },      when: ALLOWS_DELETE
@@ -96,11 +96,11 @@ module Sidekiq
         }
 
         receive_events :enter, ->(_, model) {
-          model.with(filtering: false, table: ClearSelection[model.table])
+          model.with(filtering: false, table: Actions::ClearSelection[model.table])
         }
 
         receive_events :esc, ->(_, model) {
-          model.with(filtering: false, filter: nil, table: ClearSelection[model.table])
+          model.with(filtering: false, filter: nil, table: Actions::ClearSelection[model.table])
         }
       end
 

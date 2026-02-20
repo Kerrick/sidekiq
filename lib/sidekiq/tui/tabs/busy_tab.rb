@@ -2,32 +2,33 @@
 
 module Sidekiq
   module TUI
+    # Busy tab fragment. Model stores raw ProcessData; View formats for display.
     module BusyTab
       include Rooibos::Router
 
-      Model = Data.define(:table, :status)
+      Model = Data.define(:table, :processes, :work_set_size)
 
       Init = -> {
-        Ractor.make_shareable Model.new(table: EMPTY_TABLE, status: EMPTY_BUSY_STATUS)
+        Ractor.make_shareable Model.new(table: EMPTY_TABLE, processes: [], work_set_size: 0)
       }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [RenderStats[stats, tui], RenderStatus[model.status, tui], RenderProcesses[model.table, tui]]
+          children: [Views::RenderStats[stats, tui], RenderStatus[model, tui], RenderProcesses[model, tui]]
         )
       }
 
-      receive_routed :row_down, RowDown
-      receive_routed :row_up, RowUp
-      receive_routed :toggle_select, ToggleSelect
-      receive_routed :toggle_select_all, ToggleSelectAll
+      receive_routed :row_down, Actions::RowDown
+      receive_routed :row_up, Actions::RowUp
+      receive_routed :toggle_select, Actions::ToggleSelect
+      receive_routed :toggle_select_all, Actions::ToggleSelectAll
 
       receive_routed :terminate, ->(_, model) {
         commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
         return model if commands.empty?
-        [model.with(table: ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        [model.with(table: Actions::ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :quiet, ->(_, model) {
@@ -37,29 +38,41 @@ module Sidekiq
       }
 
       receive_instances_of DataFetched, ->(message, model) {
-        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
-        model.with(table: new_table, status: message.tab_data[:status])
+        processes = message.tab_data[:processes]
+        new_table = model.table.with(row_ids: processes.map(&:identity))
+        model.with(table: new_table, processes: processes, work_set_size: message.tab_data[:work_set_size])
       }
 
       Update = from_router
 
-      RenderStatus = ->(status, tui) {
+      # --- View-layer formatting ---
+
+      RenderStatus = ->(model, tui) {
+        total_concurrency = model.processes.sum(&:concurrency)
+        total_rss = model.processes.sum(&:rss_kb)
+        utilization = (total_concurrency == 0) ? "0%" : "#{((model.work_set_size / total_concurrency.to_f) * 100).round(0)}%"
+
         keys = %w[Processes Threads Busy Utilization RSS]
-        vals = [status.processes, status.threads, status.busy, status.utilization, status.rss]
+        vals = [model.processes.size.to_s, total_concurrency.to_s, model.work_set_size.to_s,
+                utilization, Views::FormatMemory[total_rss]]
         tui.paragraph(
           text: [keys.map { |k| k.ljust(12) }.join("  "), vals.map { |v| v.to_s.ljust(12) }.join("  ")],
           block: tui.block(title: "Status", borders: [:all])
         )
       }
 
-      RenderProcesses = ->(table, tui) {
-        rows = table.rows.map.with_index { |cells, idx|
-          tui.table_row(
-            cells: [table.selected?(table.row_ids[idx]) ? "✅" : ""] + cells,
-            style: idx.even? ? nil : ALT_ROW_STYLE
-          )
+      RenderProcesses = ->(model, tui) {
+        table = model.table
+        rows = model.processes.map.with_index { |process_data, idx|
+          name = "#{process_data.hostname}:#{process_data.pid}"
+          name += " ⭐️" if process_data.leader
+          name += " 🛑" if process_data.stopping
+          cells = [table.selected?(process_data.identity) ? "✅" : "",
+                   name, process_data.started_at.to_s, Views::FormatMemory[process_data.rss_kb],
+                   process_data.concurrency.to_s, process_data.busy.to_s]
+          tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         }
-        RenderTableWidget[tui, table, title: "Processes",
+        Views::RenderTableWidget[tui, table, title: "Processes",
           header: ["☑️", "Name", "Started", "RSS", "Threads", "Busy"],
           widths: [tui.constraint_length(5), tui.constraint_fill(1), tui.constraint_length(24),
                    tui.constraint_length(10), tui.constraint_length(6), tui.constraint_length(6)],

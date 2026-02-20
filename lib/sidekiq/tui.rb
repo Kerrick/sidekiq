@@ -13,7 +13,9 @@ require "logger"
 Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
 
 require_relative "tui/tabs"
-require_relative "tui/shared"
+require_relative "tui/data"
+require_relative "tui/actions"
+require_relative "tui/views"
 require_relative "tui/messages"
 require_relative "tui/commands"
 require_relative "tui/tabs/home_tab"
@@ -216,18 +218,18 @@ module Sidekiq
       tab_bar = tui.tabs(
         titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
         selected_index: TAB_ORDER.index(model.active_tab),
-        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: TITLE_STYLE),
-        divider: " | ", highlight_style: HIGHLIGHT_STYLE
+        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Views::TITLE_STYLE),
+        divider: " | ", highlight_style: Views::HIGHLIGHT_STYLE
       )
 
       content = if model.error
-        RenderError[model.error, tui]
+        Views::RenderError[model.error, tui]
       else
         TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui, stats: model.stats]
       end
 
       spans = ControlsForTab[model.active_tab].flat_map { |key, desc|
-        [tui.text_span(content: key, style: HOTKEY_STYLE), tui.text_span(content: ": #{desc}  ")]
+        [tui.text_span(content: key, style: Views::HOTKEY_STYLE), tui.text_span(content: ": #{desc}  ")]
       }
       controls = tui.paragraph(
         text: [tui.text_line(spans: spans),
@@ -249,13 +251,13 @@ module Sidekiq
                     ["A", "Select/deselect All"], ["h/l", "Prev/next page"], ["q", "Quit"]]
       text_lines = [tui.text_line(spans: ["Welcome to the Sidekiq Terminal UI"], alignment: :center)] +
         help_lines.map { |key, desc|
-          tui.text_line(spans: [tui.text_span(content: key, style: HOTKEY_STYLE),
+          tui.text_line(spans: [tui.text_span(content: key, style: Views::HOTKEY_STYLE),
                                 tui.text_span(content: ": #{desc}")])
         }
-      content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: TITLE_STYLE,
+      content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Views::TITLE_STYLE,
                           children: [tui.paragraph(text: text_lines)])
       ctrl = tui.paragraph(
-        text: [tui.text_line(spans: [tui.text_span(content: "Esc", style: HOTKEY_STYLE),
+        text: [tui.text_line(spans: [tui.text_span(content: "Esc", style: Views::HOTKEY_STYLE),
                                      tui.text_span(content: ": Close  ")])],
         block: tui.block(title: "Controls", borders: [:all])
       )
