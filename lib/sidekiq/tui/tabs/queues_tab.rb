@@ -2,7 +2,6 @@
 
 module Sidekiq
   module TUI
-    # Queues tab fragment. Model stores raw QueueData; View formats for display.
     module QueuesTab
       include Rooibos::Router
 
@@ -36,15 +35,12 @@ module Sidekiq
         [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
-      receive_instances_of DataFetched, ->(message, model) {
-        queues = message.tab_data[:queues]
-        new_table = model.table.with(row_ids: queues.map(&:name))
-        model.with(table: new_table, queues: queues, pro: message.tab_data[:pro] || false)
+      receive_instances_of QueuesFetched, ->(message, model) {
+        new_table = model.table.with(row_ids: message.queues.map(&:name))
+        model.with(table: new_table, queues: message.queues, pro: message.pro || false)
       }
 
       Update = from_router
-
-      # --- View-layer formatting ---
 
       RenderQueues = ->(model, tui) {
         table = model.table

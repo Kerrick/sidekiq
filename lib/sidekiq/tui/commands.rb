@@ -5,65 +5,49 @@ require "sidekiq/paginator"
 
 module Sidekiq
   module TUI
-    # Shared stats fetching for all tab commands.
-    module FetchStats
-      def fetch_stats
+    # Fetches shared Sidekiq stats — dispatched on every refresh for all tabs.
+    class FetchStats < Data.define
+      include Rooibos::Command::Custom
+
+      def call(out, _token)
         raw = Sidekiq::Stats.new
-        Stats.new(
+        stats = Stats.new(
           processed: raw.processed, failed: raw.failed, busy: raw.workers_size,
           enqueued: raw.enqueued, retries: raw.retry_size,
           scheduled: raw.scheduled_size, dead: raw.dead_size
         )
-      end
-
-      def fetch_redis_url
-        Sidekiq.redis { |conn| conn.config.server_url }
-      rescue
-        "N/A"
-      end
-
-      # Single Ractor.make_shareable at the boundary.
-      def emit(out, tab, stats, tab_data, redis_url)
-        result = DataFetched.new(tab:, stats:, tab_data:, redis_url:)
-        out.put(Ractor.make_shareable(result))
-      rescue => e
-        result = DataFetchError.new(tab:, error_message: e.message, backtrace: e.backtrace&.first(10))
-        out.put(Ractor.make_shareable(result))
+        redis_url = Sidekiq.redis { |conn| conn.config.server_url } rescue "N/A"
+        out.put(Ractor.make_shareable(StatsFetched.new(stats:, redis_url:)))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Fetches Home tab data: stats deltas and Redis info.
-    class FetchHome < Data.define
+    # Fetches Redis server info — consumed by HomeTab.
+    class FetchRedisInfo < Data.define
       include Rooibos::Command::Custom
-      include FetchStats
 
       def call(out, _token)
-        stats = fetch_stats
         redis_info_raw = Sidekiq.default_configuration.redis_info
-        tab_data = {
-          processed: stats.processed,
-          failed: stats.failed,
-          redis_info: RedisInfo.new(
-            version: redis_info_raw["redis_version"] || "N/A",
-            uptime_days: redis_info_raw["uptime_in_days"] || "N/A",
-            connected_clients: redis_info_raw["connected_clients"] || "N/A",
-            used_memory: redis_info_raw["used_memory_human"] || "N/A",
-            peak_memory: redis_info_raw["used_memory_peak_human"] || "N/A"
-          )
-        }
-        emit(out, :home, stats, tab_data, fetch_redis_url)
+        redis_info = RedisInfo.new(
+          version: redis_info_raw["redis_version"] || "N/A",
+          uptime_days: redis_info_raw["uptime_in_days"] || "N/A",
+          connected_clients: redis_info_raw["connected_clients"] || "N/A",
+          used_memory: redis_info_raw["used_memory_human"] || "N/A",
+          peak_memory: redis_info_raw["used_memory_peak_human"] || "N/A"
+        )
+        out.put(Ractor.make_shareable(RedisInfoFetched.new(redis_info:)))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Fetches Busy tab data: raw process data for the View to format.
-    class FetchBusy < Data.define
+    # Fetches process list — consumed by BusyTab.
+    class FetchProcesses < Data.define
       include Rooibos::Command::Custom
-      include FetchStats
 
       def call(out, _token)
-        stats = fetch_stats
         processes = []
-
         Sidekiq::ProcessSet.new.each do |process|
           processes << ProcessData.new(
             hostname: process["hostname"], pid: process["pid"],
@@ -73,42 +57,35 @@ module Sidekiq
             leader: process.leader?, stopping: process.stopping?
           )
         end
-
         work_set_size = Sidekiq::WorkSet.new.size
-
-        tab_data = { processes:, work_set_size: }
-        emit(out, :busy, stats, tab_data, fetch_redis_url)
+        out.put(Ractor.make_shareable(ProcessesFetched.new(processes:, work_set_size:)))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Fetches Queues tab data: raw queue objects for the View to format.
+    # Fetches queue list — consumed by QueuesTab.
     class FetchQueues < Data.define
       include Rooibos::Command::Custom
-      include FetchStats
 
       def call(out, _token)
-        stats = fetch_stats
         queue_summaries = Sidekiq::Stats.new.queue_summaries.sort_by(&:name)
         pro = Sidekiq.pro?
-
         queues = queue_summaries.map { |qs|
           QueueData.new(name: qs.name, size: qs.size, latency: qs.latency.round(2), paused: pro && qs.paused?)
         }
-
-        tab_data = { queues:, pro: }
-        emit(out, :queues, stats, tab_data, fetch_redis_url)
+        out.put(Ractor.make_shareable(QueuesFetched.new(queues:, pro:)))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Fetches sorted set tab data with pagination and filtering.
-    class FetchSet < Data.define(:tab, :set_class_name, :filter, :pager_page, :pager_size)
-      include Rooibos::Command::Custom
-      include FetchStats
+    # Shared fetch logic for sorted set commands.
+    module FetchSetLogic
       include Sidekiq::Paginator
 
-      def call(out, _token)
-        stats = fetch_stats
-        set = Object.const_get(set_class_name).new
+      def fetch_set(out, set_class, message_class)
+        set = set_class.new
         current_filter = filter
 
         pager_data, rows_data, current, total =
@@ -132,22 +109,39 @@ module Sidekiq
 
         next_pg = (current * pager_data[:size] < total) ? pager_data[:page] + 1 : nil
 
-        tab_data = {
+        out.put(Ractor.make_shareable(message_class.new(
           rows:, row_ids: rows.map { |row| row[:id] },
           current_page: current, total:, next_page: next_pg,
           pager_page: pager_data[:page], pager_size: pager_data[:size]
-        }
-        emit(out, tab, stats, tab_data, fetch_redis_url)
+        )))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Fetches Metrics tab data: job execution time series.
-    class FetchMetrics < Data.define
+    class FetchScheduledSet < Data.define(:filter, :pager_page, :pager_size)
       include Rooibos::Command::Custom
-      include FetchStats
+      include FetchSetLogic
+      def call(out, _token) = fetch_set(out, Sidekiq::ScheduledSet, ScheduledFetched)
+    end
+
+    class FetchRetrySet < Data.define(:filter, :pager_page, :pager_size)
+      include Rooibos::Command::Custom
+      include FetchSetLogic
+      def call(out, _token) = fetch_set(out, Sidekiq::RetrySet, RetriesFetched)
+    end
+
+    class FetchDeadSet < Data.define(:filter, :pager_page, :pager_size)
+      include Rooibos::Command::Custom
+      include FetchSetLogic
+      def call(out, _token) = fetch_set(out, Sidekiq::DeadSet, DeadFetched)
+    end
+
+    # Fetches job metrics time series — consumed by MetricsTab.
+    class FetchJobMetrics < Data.define
+      include Rooibos::Command::Custom
 
       def call(out, _token)
-        stats = fetch_stats
         query = Sidekiq::Metrics::Query.new
         query_result = query.top_jobs(minutes: 60)
         job_results = query_result.job_results.sort_by { |(_kls, jr)| jr.totals["s"] }.reverse.first(7)
@@ -165,16 +159,18 @@ module Sidekiq
           { name: kls, data: points }
         }
 
-        tab_data = {
+        out.put(Ractor.make_shareable(MetricsFetched.new(
           datasets:,
           starts_at: query_result.starts_at.iso8601[11..15],
           ends_at: query_result.ends_at.iso8601[11..15]
-        }
-        emit(out, :metrics, stats, tab_data, fetch_redis_url)
+        )))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
       end
     end
 
-    # Executes a destructive action on a Sidekiq sorted set.
+    # Destructive action commands — these produce ActionComplete.
+
     class AlterSetRows < Data.define(:set_class_name, :ids, :action_name, :tab)
       include Rooibos::Command::Custom
 

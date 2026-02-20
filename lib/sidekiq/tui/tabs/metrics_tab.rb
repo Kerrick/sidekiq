@@ -21,9 +21,9 @@ module Sidekiq
 
       Update = ->(message, model) {
         case message
-        in DataFetched
-          model.with(datasets: message.tab_data[:datasets], starts_at: message.tab_data[:starts_at],
-                     ends_at: message.tab_data[:ends_at], metrics_refresh_at: Time.now + 60)
+        in MetricsFetched
+          model.with(datasets: message.datasets, starts_at: message.starts_at,
+                     ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
         else
           model
         end

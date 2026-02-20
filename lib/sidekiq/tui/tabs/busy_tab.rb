@@ -2,7 +2,6 @@
 
 module Sidekiq
   module TUI
-    # Busy tab fragment. Model stores raw ProcessData; View formats for display.
     module BusyTab
       include Rooibos::Router
 
@@ -37,15 +36,12 @@ module Sidekiq
         [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
-      receive_instances_of DataFetched, ->(message, model) {
-        processes = message.tab_data[:processes]
-        new_table = model.table.with(row_ids: processes.map(&:identity))
-        model.with(table: new_table, processes: processes, work_set_size: message.tab_data[:work_set_size])
+      receive_instances_of ProcessesFetched, ->(message, model) {
+        new_table = model.table.with(row_ids: message.processes.map(&:identity))
+        model.with(table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }
 
       Update = from_router
-
-      # --- View-layer formatting ---
 
       RenderStatus = ->(model, tui) {
         total_concurrency = model.processes.sum(&:concurrency)

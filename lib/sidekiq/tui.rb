@@ -55,7 +55,7 @@ module Sidekiq
                            allowed_actions: %i[delete add_to_queue]],
         metrics: MetricsTab::Init[]
       )
-      [model, Rooibos::Command.batch(FetchHome.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
+      [model, Rooibos::Command.batch(FetchStats.new, FetchRedisInfo.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
     }
 
     View = ->(model, tui) {
@@ -108,31 +108,18 @@ module Sidekiq
 
     # --- Data fetch results ---
 
-    observe_instances_of DataFetched, ->(message, model) {
+    observe_instances_of StatsFetched, ->(message, model) {
       model.with(stats: message.stats, redis_url: message.redis_url, error: nil)
     }
 
-    only when: ->(message, _) { message.tab == :home } do
-      forward_instances_of DataFetched, to: :home
-    end
-    only when: ->(message, _) { message.tab == :busy } do
-      forward_instances_of DataFetched, to: :busy
-    end
-    only when: ->(message, _) { message.tab == :queues } do
-      forward_instances_of DataFetched, to: :queues
-    end
-    only when: ->(message, _) { message.tab == :scheduled } do
-      forward_instances_of DataFetched, to: :scheduled
-    end
-    only when: ->(message, _) { message.tab == :retries } do
-      forward_instances_of DataFetched, to: :retries
-    end
-    only when: ->(message, _) { message.tab == :dead } do
-      forward_instances_of DataFetched, to: :dead
-    end
-    only when: ->(message, _) { message.tab == :metrics } do
-      forward_instances_of DataFetched, to: :metrics
-    end
+    forward_instances_of StatsFetched, to: :home
+    forward_instances_of RedisInfoFetched, to: :home
+    forward_instances_of ProcessesFetched, to: :busy
+    forward_instances_of QueuesFetched, to: :queues
+    forward_instances_of ScheduledFetched, to: :scheduled
+    forward_instances_of RetriesFetched, to: :retries
+    forward_instances_of DeadFetched, to: :dead
+    forward_instances_of MetricsFetched, to: :metrics
 
     receive_instances_of DataFetchError, ->(message, model) {
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
@@ -216,17 +203,24 @@ module Sidekiq
     # --- Helper lambdas ---
 
     FetchCommandFor = ->(model, tab) {
-      case tab
-      when :home then FetchHome.new
-      when :busy then FetchBusy.new
-      when :queues then FetchQueues.new
-      when :scheduled, :retries, :dead
-        set_model = model.public_send(tab)
-        FetchSet.new(tab:, set_class_name: SET_CLASS_NAMES[tab],
-                     filter: set_model.filter, pager_page: set_model.pager.page,
-                     pager_size: set_model.pager.size)
-      when :metrics then FetchMetrics.new
+      shared = FetchStats.new
+      tab_commands = case tab
+        when :home then [FetchRedisInfo.new]
+        when :busy then [FetchProcesses.new]
+        when :queues then [FetchQueues.new]
+        when :scheduled
+          [FetchScheduledSet.new(filter: model.scheduled.filter, pager_page: model.scheduled.pager.page,
+                                 pager_size: model.scheduled.pager.size)]
+        when :retries
+          [FetchRetrySet.new(filter: model.retries.filter, pager_page: model.retries.pager.page,
+                             pager_size: model.retries.pager.size)]
+        when :dead
+          [FetchDeadSet.new(filter: model.dead.filter, pager_page: model.dead.pager.page,
+                            pager_size: model.dead.pager.size)]
+        when :metrics then [FetchJobMetrics.new]
+        else []
       end
+      Rooibos::Command.batch(shared, *tab_commands)
     }
 
     ControlsForTab = ->(tab) {

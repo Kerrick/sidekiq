@@ -3,7 +3,6 @@
 module Sidekiq
   module TUI
     # Reusable set tab fragment — one module, three routes (scheduled, retries, dead).
-    # Configurable via model fields (tab_name, set_class_name, allowed_actions).
     module SetTab
       include Rooibos::Router
 
@@ -45,20 +44,26 @@ module Sidekiq
       receive_routed :toggle_select, Actions::ToggleSelect
       receive_routed :toggle_select_all, Actions::ToggleSelectAll
 
+      SET_FETCH_COMMANDS = Ractor.make_shareable({
+        scheduled: FetchScheduledSet,
+        retries: FetchRetrySet,
+        dead: FetchDeadSet
+      })
+
       receive_routed :prev_page, ->(_, model) {
         return model if model.pager.page < 2
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
-        [new_model, FetchSet.new(tab: model.tab_name, set_class_name: model.set_class_name,
-                                 filter: model.filter, pager_page: new_pager.page, pager_size: new_pager.size)]
+        [new_model, SET_FETCH_COMMANDS[model.tab_name].new(
+          filter: model.filter, pager_page: new_pager.page, pager_size: new_pager.size)]
       }
 
       receive_routed :next_page, ->(_, model) {
         return model unless model.pager.next_page
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
-        [new_model, FetchSet.new(tab: model.tab_name, set_class_name: model.set_class_name,
-                                 filter: model.filter, pager_page: new_pager.page, pager_size: new_pager.size)]
+        [new_model, SET_FETCH_COMMANDS[model.tab_name].new(
+          filter: model.filter, pager_page: new_pager.page, pager_size: new_pager.size)]
       }
 
       receive_routed :start_filter, ->(_, model) { model.with(filtering: true, filter: "") }
@@ -83,7 +88,7 @@ module Sidekiq
       receive_routed :enqueue, ->(_, model) { MakeAlterCommand[model, :add_to_queue] }, guard: ALLOWS_ENQUEUE
       receive_routed :kill,    ->(_, model) { MakeAlterCommand[model, :kill] },         guard: ALLOWS_KILL
 
-      # --- Filtering modal: raw events forwarded by root when filtering is active ---
+      # --- Filtering modal ---
 
       FILTERING_ACTIVE = ->(_, model) { model.filtering }
 
@@ -104,16 +109,20 @@ module Sidekiq
         }
       end
 
-      # --- Data integration ---
+      # --- Data integration: one handler per set-fetched type, shared logic ---
 
-      receive_instances_of DataFetched, ->(message, model) {
-        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
+      ApplySetData = ->(message, model) {
+        new_table = model.table.with(rows: message.rows, row_ids: message.row_ids)
         new_pager = model.pager.with(
-          current_page: message.tab_data[:current_page], total: message.tab_data[:total],
-          next_page: message.tab_data[:next_page], page: message.tab_data[:pager_page], size: message.tab_data[:pager_size]
+          current_page: message.current_page, total: message.total,
+          next_page: message.next_page, page: message.pager_page, size: message.pager_size
         )
         model.with(table: new_table, pager: new_pager)
       }
+
+      receive_instances_of ScheduledFetched, ApplySetData
+      receive_instances_of RetriesFetched, ApplySetData
+      receive_instances_of DeadFetched, ApplySetData
 
       Update = from_router
     end

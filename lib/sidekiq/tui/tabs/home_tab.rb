@@ -27,16 +27,17 @@ module Sidekiq
 
       Update = ->(message, model) {
         case message
-        in DataFetched
-          pd = message.tab_data[:processed] - model.previous_processed
-          fd = message.tab_data[:failed] - model.previous_failed
+        in StatsFetched
+          pd = message.stats.processed - model.previous_processed
+          fd = message.stats.failed - model.previous_failed
           model.with(
             chart_deltas_processed: model.chart_deltas_processed[1..] + [pd],
             chart_deltas_failed: model.chart_deltas_failed[1..] + [fd],
-            previous_processed: message.tab_data[:processed],
-            previous_failed: message.tab_data[:failed],
-            redis_info: message.tab_data[:redis_info]
+            previous_processed: message.stats.processed,
+            previous_failed: message.stats.failed
           )
+        in RedisInfoFetched
+          model.with(redis_info: message.redis_info)
         else
           model
         end
