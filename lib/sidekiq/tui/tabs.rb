@@ -1,43 +1,24 @@
-require_relative "tabs/home"
-require_relative "tabs/busy"
-require_relative "tabs/queues"
-require_relative "tabs/scheduled"
-require_relative "tabs/retries"
-require_relative "tabs/dead"
-require_relative "tabs/metrics"
+# frozen_string_literal: true
 
 module Sidekiq
-  class TUI
-    module Tabs
-      Set = Set.new([Home, Busy, Queues, Scheduled, Retries, Dead, Metrics])
+  module TUI
+    TAB_ORDER = %i[home busy queues scheduled retries dead metrics].freeze
+    TAB_NAMES = {
+      home: "Home",
+      busy: "Busy",
+      queues: "Queues",
+      scheduled: "Scheduled",
+      retries: "Retries",
+      dead: "Dead",
+      metrics: "Metrics"
+    }.freeze
 
-      def self.all
-        @all ||= Set.map(&:new)
-      end
+    SET_TABS = %i[scheduled retries dead].freeze
 
-      def self.current
-        @current ||= all.first
-      end
-
-      # Navigate tabs to the left or right.
-      # @param direction [Symbol] :left or :right
-      def self.navigate(direction)
-        index_change = (direction == :right) ? 1 : -1
-        @current = all[(all.index(current) + index_change) % all.size]
-        current.reset_data
-      end
-
-      def self.showing
-        @showing ||= :main
-      end
-
-      def self.show_main
-        @showing = :main
-      end
-
-      def self.show_help
-        @showing = :help
-      end
-    end
+    SET_CLASS_NAMES = {
+      scheduled: "Sidekiq::ScheduledSet",
+      retries: "Sidekiq::RetrySet",
+      dead: "Sidekiq::DeadSet"
+    }.freeze
   end
 end
