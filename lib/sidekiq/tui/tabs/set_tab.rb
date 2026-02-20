@@ -78,10 +78,10 @@ module Sidekiq
         [model.with(table: Actions::ClearSelection[model.table]), command]
       }
 
-      receive_routed :delete,  ->(_, model) { MakeAlterCommand[model, :delete] },      when: ALLOWS_DELETE
-      receive_routed :retry,   ->(_, model) { MakeAlterCommand[model, :retry] },       when: ALLOWS_RETRY
-      receive_routed :enqueue, ->(_, model) { MakeAlterCommand[model, :add_to_queue] }, when: ALLOWS_ENQUEUE
-      receive_routed :kill,    ->(_, model) { MakeAlterCommand[model, :kill] },         when: ALLOWS_KILL
+      receive_routed :delete,  ->(_, model) { MakeAlterCommand[model, :delete] },      guard: ALLOWS_DELETE
+      receive_routed :retry,   ->(_, model) { MakeAlterCommand[model, :retry] },       guard: ALLOWS_RETRY
+      receive_routed :enqueue, ->(_, model) { MakeAlterCommand[model, :add_to_queue] }, guard: ALLOWS_ENQUEUE
+      receive_routed :kill,    ->(_, model) { MakeAlterCommand[model, :kill] },         guard: ALLOWS_KILL
 
       # --- Filtering modal: raw events forwarded by root when filtering is active ---
 

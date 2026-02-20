@@ -112,13 +112,27 @@ module Sidekiq
       model.with(stats: message.stats, redis_url: message.redis_url, error: nil)
     }
 
-    forward_instances_of DataFetched, to: :home, when: ->(message, _) { message.tab == :home }
-    forward_instances_of DataFetched, to: :busy, when: ->(message, _) { message.tab == :busy }
-    forward_instances_of DataFetched, to: :queues, when: ->(message, _) { message.tab == :queues }
-    forward_instances_of DataFetched, to: :scheduled, when: ->(message, _) { message.tab == :scheduled }
-    forward_instances_of DataFetched, to: :retries, when: ->(message, _) { message.tab == :retries }
-    forward_instances_of DataFetched, to: :dead, when: ->(message, _) { message.tab == :dead }
-    forward_instances_of DataFetched, to: :metrics, when: ->(message, _) { message.tab == :metrics }
+    only when: ->(message, _) { message.tab == :home } do
+      forward_instances_of DataFetched, to: :home
+    end
+    only when: ->(message, _) { message.tab == :busy } do
+      forward_instances_of DataFetched, to: :busy
+    end
+    only when: ->(message, _) { message.tab == :queues } do
+      forward_instances_of DataFetched, to: :queues
+    end
+    only when: ->(message, _) { message.tab == :scheduled } do
+      forward_instances_of DataFetched, to: :scheduled
+    end
+    only when: ->(message, _) { message.tab == :retries } do
+      forward_instances_of DataFetched, to: :retries
+    end
+    only when: ->(message, _) { message.tab == :dead } do
+      forward_instances_of DataFetched, to: :dead
+    end
+    only when: ->(message, _) { message.tab == :metrics } do
+      forward_instances_of DataFetched, to: :metrics
+    end
 
     receive_instances_of DataFetchError, ->(message, model) {
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
@@ -160,17 +174,40 @@ module Sidekiq
       end
     end
 
-    %i[scheduled retries dead].each do |tab|
-      not_filtering = ->(_, model) { model.active_tab == tab && !model.public_send(tab).filtering }
-      only when: not_filtering do
-        route_to tab do
-          SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-          forward_events :shift_D, as: :delete
-          forward_events :shift_R, as: :retry
-          forward_events :shift_E, as: :enqueue
-          forward_events :shift_K, as: :kill
-          forward_events :"/", as: :start_filter
-        end
+    SCHEDULED_NOT_FILTERING = ->(_, model) { model.active_tab == :scheduled && !model.scheduled.filtering }
+    RETRIES_NOT_FILTERING   = ->(_, model) { model.active_tab == :retries && !model.retries.filtering }
+    DEAD_NOT_FILTERING      = ->(_, model) { model.active_tab == :dead && !model.dead.filtering }
+
+    only when: SCHEDULED_NOT_FILTERING do
+      route_to :scheduled do
+        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
+        forward_events :shift_D, as: :delete
+        forward_events :shift_R, as: :retry
+        forward_events :shift_E, as: :enqueue
+        forward_events :shift_K, as: :kill
+        forward_events :"/", as: :start_filter
+      end
+    end
+
+    only when: RETRIES_NOT_FILTERING do
+      route_to :retries do
+        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
+        forward_events :shift_D, as: :delete
+        forward_events :shift_R, as: :retry
+        forward_events :shift_E, as: :enqueue
+        forward_events :shift_K, as: :kill
+        forward_events :"/", as: :start_filter
+      end
+    end
+
+    only when: DEAD_NOT_FILTERING do
+      route_to :dead do
+        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
+        forward_events :shift_D, as: :delete
+        forward_events :shift_R, as: :retry
+        forward_events :shift_E, as: :enqueue
+        forward_events :shift_K, as: :kill
+        forward_events :"/", as: :start_filter
       end
     end
 
