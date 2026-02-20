@@ -4,21 +4,21 @@ module Sidekiq
   module TUI
     # Value objects — domain data structures shared across the application.
 
-    Stats = Data.define(:processed, :failed, :busy, :enqueued, :retries, :scheduled, :dead)
-    RedisInfo = Data.define(:version, :uptime_days, :connected_clients, :used_memory, :peak_memory)
+    class Stats < Data.define(:processed, :failed, :busy, :enqueued, :retries, :scheduled, :dead); end
+    class RedisInfo < Data.define(:version, :uptime_days, :connected_clients, :used_memory, :peak_memory); end
 
-    TableState = Data.define(:rows, :row_ids, :selected, :selected_row_index) do
+    class TableState < Data.define(:rows, :row_ids, :selected, :selected_row_index)
       def selected?(id) = selected.include?(id)
       def action_ids = selected.empty? ? (row_ids.empty? ? [] : [row_ids[selected_row_index]]) : selected
     end
 
-    PagerState = Data.define(:page, :size, :current_page, :total, :next_page)
+    class PagerState < Data.define(:page, :size, :current_page, :total, :next_page); end
 
     # Raw process data returned by Commands — formatting happens in the View.
-    ProcessData = Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader, :stopping)
+    class ProcessData < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader, :stopping); end
 
     # Raw queue data returned by Commands.
-    QueueData = Data.define(:name, :size, :latency, :paused)
+    class QueueData < Data.define(:name, :size, :latency, :paused); end
 
     EMPTY_TABLE = Ractor.make_shareable(
       TableState.new(rows: [], row_ids: [], selected: [], selected_row_index: 0)

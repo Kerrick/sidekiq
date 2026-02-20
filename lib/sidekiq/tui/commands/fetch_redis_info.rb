@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    RedisInfoFetched = Data.define(:redis_info) do
+    class RedisInfoFetched < Data.define(:redis_info)
       include Rooibos::Message::Predicates
     end
 

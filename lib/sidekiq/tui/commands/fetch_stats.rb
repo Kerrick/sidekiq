@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    StatsFetched = Data.define(:stats, :redis_url) do
+    class StatsFetched < Data.define(:stats, :redis_url)
       include Rooibos::Message::Predicates
     end
 

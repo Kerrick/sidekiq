@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    ProcessesFetched = Data.define(:processes, :work_set_size) do
+    class ProcessesFetched < Data.define(:processes, :work_set_size)
       include Rooibos::Message::Predicates
     end
 

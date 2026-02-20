@@ -5,15 +5,15 @@ require "sidekiq/paginator"
 module Sidekiq
   module TUI
     # Three message types — one per set tab — for type-based routing.
-    ScheduledFetched = Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size) do
+    class ScheduledFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
       include Rooibos::Message::Predicates
     end
 
-    RetriesFetched = Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size) do
+    class RetriesFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
       include Rooibos::Message::Predicates
     end
 
-    DeadFetched = Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size) do
+    class DeadFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
       include Rooibos::Message::Predicates
     end
 

@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    QueuesFetched = Data.define(:queues, :pro) do
+    class QueuesFetched < Data.define(:queues, :pro)
       include Rooibos::Message::Predicates
     end
 

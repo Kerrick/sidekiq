@@ -4,11 +4,11 @@ module Sidekiq
   module TUI
     # Shared messages produced by multiple commands.
 
-    ActionComplete = Data.define(:tab, :action) do
+    class ActionComplete < Data.define(:tab, :action)
       include Rooibos::Message::Predicates
     end
 
-    DataFetchError = Data.define(:error_message, :backtrace) do
+    class DataFetchError < Data.define(:error_message, :backtrace)
       include Rooibos::Message::Predicates
     end
   end

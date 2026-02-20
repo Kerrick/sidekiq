@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    MetricsFetched = Data.define(:datasets, :starts_at, :ends_at) do
+    class MetricsFetched < Data.define(:datasets, :starts_at, :ends_at)
       include Rooibos::Message::Predicates
     end
 
