@@ -14,7 +14,7 @@ module Sidekiq
       Model = Data.define(:table, :processes, :work_set_size)
 
       Init = -> {
-        Ractor.make_shareable Model.new(table: EMPTY_TABLE, processes: [], work_set_size: 0)
+        Ractor.make_shareable Model.new(table: TableFragment::Init[], processes: [], work_set_size: 0)
       }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
@@ -25,15 +25,18 @@ module Sidekiq
         )
       }
 
-      receive_routed :row_down, Actions::RowDown
-      receive_routed :row_up, Actions::RowUp
-      receive_routed :toggle_select, Actions::ToggleSelect
-      receive_routed :toggle_select_all, Actions::ToggleSelectAll
+      route :table, to: TableFragment
+
+      forward_routed :row_down, to: :table
+      forward_routed :row_up, to: :table
+      forward_routed :toggle_select, to: :table
+      forward_routed :toggle_select_all, to: :table
 
       receive_routed :terminate, ->(_, model) {
         commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
         return model if commands.empty?
-        [model.with(table: Actions::ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        [model.with(table: TableFragment::ClearSelection[model.table]),
+         commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :quiet, ->(_, model) {
@@ -74,7 +77,7 @@ module Sidekiq
                    process_data.concurrency.to_s, process_data.busy.to_s]
           tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         }
-        Views::RenderTableWidget[tui, table, title: "Processes",
+        TableFragment::View[table, tui, title: "Processes",
           header: ["☑️", "Name", "Started", "RSS", "Threads", "Busy"],
           widths: [tui.constraint_length(5), tui.constraint_fill(1), tui.constraint_length(24),
                    tui.constraint_length(10), tui.constraint_length(6), tui.constraint_length(6)],

@@ -14,10 +14,10 @@ Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
 
 require_relative "tui/tabs"
 require_relative "tui/data"
-require_relative "tui/actions"
 require_relative "tui/views"
 require_relative "tui/messages"
 require_relative "tui/commands"
+require_relative "tui/fragments/table_fragment"
 require_relative "tui/tabs/home_tab"
 require_relative "tui/tabs/busy_tab"
 require_relative "tui/tabs/queues_tab"

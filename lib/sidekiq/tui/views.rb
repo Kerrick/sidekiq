@@ -34,23 +34,6 @@ module Sidekiq
         )
       }
 
-      RenderTableWidget = ->(tui, table, header:, widths:, title:, rows:, pager: nil, filter_state: nil) {
-        page = pager&.current_page || 1
-        total = pager&.total || table.rows.size
-        footer = ["", "Page: #{page}", "Count: #{table.rows.size}", "Total: #{total}"]
-        footer << "Selected: #{table.selected.size}" unless table.selected.empty?
-        if filter_state
-          spans = [tui.text_span(content: "Filter: ", style: FILTER_STYLE),
-                   tui.text_span(content: filter_state[:filter] || "", style: FILTER_STYLE)]
-          spans << tui.text_span(content: "_", style: BLINK_STYLE) if filter_state[:filtering]
-          footer << tui.text_line(spans: spans)
-        end
-        tui.table(highlight_symbol: "➡️", selected_row: table.selected_row_index,
-                  row_highlight_style: ROW_HL_STYLE, footer: footer,
-                  header: header, widths: widths, rows: rows,
-                  block: tui.block(title: title, borders: :all))
-      }
-
       RenderError = ->(error, tui) {
         text = error.is_a?(Exception) ? error.message : error.to_s
         tui.paragraph(text: text, alignment: :center,

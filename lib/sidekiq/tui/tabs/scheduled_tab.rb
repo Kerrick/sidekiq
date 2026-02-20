@@ -13,11 +13,12 @@ module Sidekiq
         [FetchScheduledSet.new(filter: model.filter, pager_page: model.pager.page, pager_size: model.pager.size)]
       }
 
-      Model = Data.define(:table, :pager, :filter, :filtering, :tab_name, :set_class_name)
+      Model = Data.define(:table, :pager, :rows, :filter, :filtering, :tab_name, :set_class_name)
 
       Init = -> {
         Ractor.make_shareable Model.new(
-          table: EMPTY_TABLE, pager: EMPTY_PAGER, filter: nil, filtering: false,
+          table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
+          filter: nil, filtering: false,
           tab_name: :scheduled, set_class_name: "Sidekiq::ScheduledSet"
         )
       }

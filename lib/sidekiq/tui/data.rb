@@ -7,11 +7,6 @@ module Sidekiq
     class Stats < Data.define(:processed, :failed, :busy, :enqueued, :retries, :scheduled, :dead); end
     class RedisInfo < Data.define(:version, :uptime_days, :connected_clients, :used_memory, :peak_memory); end
 
-    class TableState < Data.define(:rows, :row_ids, :selected, :selected_row_index)
-      def selected?(id) = selected.include?(id)
-      def action_ids = selected.empty? ? (row_ids.empty? ? [] : [row_ids[selected_row_index]]) : selected
-    end
-
     class PagerState < Data.define(:page, :size, :current_page, :total, :next_page); end
 
     # Raw process data returned by Commands — formatting happens in the View.
@@ -23,9 +18,6 @@ module Sidekiq
     # Couples a key binding with its semantic name and display label.
     class TabControl < Data.define(:key, :semantic, :display_key, :description); end
 
-    EMPTY_TABLE = Ractor.make_shareable(
-      TableState.new(rows: [], row_ids: [], selected: [], selected_row_index: 0)
-    )
     EMPTY_PAGER = Ractor.make_shareable(
       PagerState.new(page: 1, size: 25, current_page: 1, total: 0, next_page: nil)
     )

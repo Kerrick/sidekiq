@@ -12,7 +12,7 @@ module Sidekiq
       FetchCommand = ->(_model) { [FetchQueues.new] }
 
       Model = Data.define(:table, :queues, :pro)
-      Init = -> { Ractor.make_shareable Model.new(table: EMPTY_TABLE, queues: [], pro: false) }
+      Init = -> { Ractor.make_shareable Model.new(table: TableFragment::Init[], queues: [], pro: false) }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
         tui.layout(
@@ -22,16 +22,19 @@ module Sidekiq
         )
       }
 
-      receive_routed :row_down, Actions::RowDown
-      receive_routed :row_up, Actions::RowUp
-      receive_routed :toggle_select, Actions::ToggleSelect
-      receive_routed :toggle_select_all, Actions::ToggleSelectAll
+      route :table, to: TableFragment
+
+      forward_routed :row_down, to: :table
+      forward_routed :row_up, to: :table
+      forward_routed :toggle_select, to: :table
+      forward_routed :toggle_select_all, to: :table
 
       receive_routed :delete_queue, ->(_, model) {
         ids = model.table.action_ids
         return model if ids.empty?
         commands = ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
-        [model.with(table: Actions::ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+        [model.with(table: TableFragment::ClearSelection[model.table]),
+         commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :toggle_pause, ->(_, model) {
@@ -59,7 +62,7 @@ module Sidekiq
           tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         }
         widths = header.map.with_index { |_, i| tui.constraint_length((i == 1) ? 60 : 10) }
-        Views::RenderTableWidget[tui, table, title: "Queues", header: header, widths: widths, rows: rows]
+        TableFragment::View[table, tui, title: "Queues", header: header, widths: widths, rows: rows]
       }
     end
   end

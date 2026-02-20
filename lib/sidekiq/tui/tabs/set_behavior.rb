@@ -20,16 +20,16 @@ module Sidekiq
         return model if ids.empty?
         command = AlterSetRows.new(set_class_name: model.set_class_name, ids: ids,
                                    action_name:, tab: model.tab_name)
-        [model.with(table: Actions::ClearSelection[model.table]), command]
+        [model.with(table: TableFragment::ClearSelection[model.table]), command]
       }
 
       ApplySetData = ->(message, model) {
-        new_table = model.table.with(rows: message.rows, row_ids: message.row_ids)
+        new_table = model.table.with(row_ids: message.row_ids)
         new_pager = model.pager.with(
           current_page: message.current_page, total: message.total,
           next_page: message.next_page, page: message.pager_page, size: message.pager_size
         )
-        model.with(table: new_table, pager: new_pager)
+        model.with(table: new_table, pager: new_pager, rows: message.rows)
       }
 
       StartFilter = ->(_, model) { model.with(filtering: true, filter: "") }
@@ -38,14 +38,14 @@ module Sidekiq
 
       RenderSetTable = ->(model, tui, stats: EMPTY_STATS) {
         filter_state = { filter: model.filter, filtering: model.filtering }
-        rows = model.table.rows.map.with_index { |entry, idx|
+        rows = model.rows.map.with_index { |entry, idx|
           tui.table_row(
             cells: [model.table.selected?(entry[:id]) ? "✅" : "",
                     entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
             style: idx.even? ? nil : Views::ALT_ROW_STYLE
           )
         }
-        table_widget = Views::RenderTableWidget[tui, model.table,
+        table_widget = TableFragment::View[model.table, tui,
           title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager, filter_state: filter_state,
           header: ["☑️", "When", "Queue", "Job", "Arguments"],
           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
@@ -61,10 +61,13 @@ module Sidekiq
 
       def self.included(base)
         base.module_eval do
-          receive_routed :row_down, Actions::RowDown
-          receive_routed :row_up, Actions::RowUp
-          receive_routed :toggle_select, Actions::ToggleSelect
-          receive_routed :toggle_select_all, Actions::ToggleSelectAll
+          route :table, to: TableFragment
+
+          forward_routed :row_down, to: :table
+          forward_routed :row_up, to: :table
+          forward_routed :toggle_select, to: :table
+          forward_routed :toggle_select_all, to: :table
+
           receive_routed :start_filter, SetBehavior::StartFilter
 
           receive_routed :prev_page, ->(_, model) {
@@ -91,11 +94,11 @@ module Sidekiq
             }
 
             receive_events :enter, ->(_, model) {
-              model.with(filtering: false, table: Actions::ClearSelection[model.table])
+              model.with(filtering: false, table: TableFragment::ClearSelection[model.table])
             }
 
             receive_events :esc, ->(_, model) {
-              model.with(filtering: false, filter: nil, table: Actions::ClearSelection[model.table])
+              model.with(filtering: false, filter: nil, table: TableFragment::ClearSelection[model.table])
             }
           end
         end
