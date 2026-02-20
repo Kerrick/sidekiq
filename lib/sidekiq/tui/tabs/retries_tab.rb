@@ -4,37 +4,48 @@ module Sidekiq
   module TUI
     module RetriesTab
       include Rooibos::Router
-      include SetBehavior
 
-      Controls = [SetBehavior::DELETE_CONTROL, SetBehavior::RETRY_CONTROL,
-                  SetBehavior::KILL_CONTROL, SetBehavior::FILTER_CONTROL]
+      Controls = [
+        TabControl.new(key: :shift_D, semantic: :delete,       display_key: "D", description: "Delete"),
+        TabControl.new(key: :shift_R, semantic: :retry,        display_key: "R", description: "Retry"),
+        TabControl.new(key: :shift_K, semantic: :kill,          display_key: "K", description: "Kill"),
+        TabControl.new(key: :"/",     semantic: :start_filter, display_key: "/", description: "Filter")
+      ]
 
       FetchCommand = ->(model) {
-        [FetchRetrySet.new(filter: model.filter, pager_page: model.pager.page, pager_size: model.pager.size)]
+        [FetchRetrySet.new(filter: model.set.filter, pager_page: model.set.pager.page,
+                           pager_size: model.set.pager.size)]
       }
 
-      Model = Data.define(:table, :pager, :rows, :filter, :filtering, :tab_name, :set_class_name)
+      Model = Data.define(:set)
 
       Init = -> {
-        Ractor.make_shareable Model.new(
-          table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
-          filter: nil, filtering: false,
-          tab_name: :retries, set_class_name: "Sidekiq::RetrySet"
-        )
+        Ractor.make_shareable Model.new(set: SetFragment::Init[tab_name: :retries])
       }
 
-      View = SetBehavior::RenderSetTable
+      View = ->(model, tui, stats: EMPTY_STATS) {
+        SetFragment::View[model.set, tui, stats:]
+      }
 
-      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+      route :set, to: SetFragment
+      otherwise route_to: :set
+
+      forward_instances_of RetriesFetched, to: :set, as: :data_received
+
+      HandleAction = ->(message, model) {
         case message.action
-        when :delete then [model, SetBehavior::MakeAlterCommand[model, :delete, message.ids]]
-        when :retry  then [model, SetBehavior::MakeAlterCommand[model, :retry, message.ids]]
-        when :kill   then [model, SetBehavior::MakeAlterCommand[model, :kill, message.ids]]
+        when :delete then [model, AlterSetRows.new(set_class_name: "Sidekiq::RetrySet", ids: message.ids, action_name: :delete, tab: :retries)]
+        when :retry  then [model, AlterSetRows.new(set_class_name: "Sidekiq::RetrySet", ids: message.ids, action_name: :retry, tab: :retries)]
+        when :kill   then [model, AlterSetRows.new(set_class_name: "Sidekiq::RetrySet", ids: message.ids, action_name: :kill, tab: :retries)]
         else model
         end
       }
+      intercept_instances_of TableFragment::ActionRequested, HandleAction
 
-      receive_instances_of RetriesFetched, SetBehavior::ApplySetData
+      HandleFetch = ->(message, model) {
+        [model, FetchRetrySet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
+      }
+      intercept_instances_of SetFragment::FetchRequested, HandleFetch
 
       Update = from_router
     end

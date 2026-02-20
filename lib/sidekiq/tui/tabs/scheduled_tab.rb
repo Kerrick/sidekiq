@@ -4,37 +4,51 @@ module Sidekiq
   module TUI
     module ScheduledTab
       include Rooibos::Router
-      include SetBehavior
 
-      Controls = [SetBehavior::DELETE_CONTROL, SetBehavior::ENQUEUE_CONTROL,
-                  SetBehavior::KILL_CONTROL, SetBehavior::FILTER_CONTROL]
+      Controls = [
+        TabControl.new(key: :shift_D, semantic: :delete,       display_key: "D", description: "Delete"),
+        TabControl.new(key: :shift_E, semantic: :enqueue,      display_key: "E", description: "Enqueue"),
+        TabControl.new(key: :shift_K, semantic: :kill,         display_key: "K", description: "Kill"),
+        TabControl.new(key: :"/",     semantic: :start_filter, display_key: "/", description: "Filter")
+      ]
 
       FetchCommand = ->(model) {
-        [FetchScheduledSet.new(filter: model.filter, pager_page: model.pager.page, pager_size: model.pager.size)]
+        [FetchScheduledSet.new(filter: model.set.filter, pager_page: model.set.pager.page,
+                               pager_size: model.set.pager.size)]
       }
 
-      Model = Data.define(:table, :pager, :rows, :filter, :filtering, :tab_name, :set_class_name)
+      Model = Data.define(:set)
 
       Init = -> {
-        Ractor.make_shareable Model.new(
-          table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
-          filter: nil, filtering: false,
-          tab_name: :scheduled, set_class_name: "Sidekiq::ScheduledSet"
-        )
+        Ractor.make_shareable Model.new(set: SetFragment::Init[tab_name: :scheduled])
       }
 
-      View = SetBehavior::RenderSetTable
+      View = ->(model, tui, stats: EMPTY_STATS) {
+        SetFragment::View[model.set, tui, stats:]
+      }
 
-      intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+      route :set, to: SetFragment
+      otherwise route_to: :set
+
+      # Inward: forward semantic data message to SetFragment
+      forward_instances_of ScheduledFetched, to: :set, as: :data_received
+
+      # Outward: intercept action bubbles from TableFragment
+      HandleAction = ->(message, model) {
         case message.action
-        when :delete  then [model, SetBehavior::MakeAlterCommand[model, :delete, message.ids]]
-        when :enqueue then [model, SetBehavior::MakeAlterCommand[model, :add_to_queue, message.ids]]
-        when :kill    then [model, SetBehavior::MakeAlterCommand[model, :kill, message.ids]]
+        when :delete  then [model, AlterSetRows.new(set_class_name: "Sidekiq::ScheduledSet", ids: message.ids, action_name: :delete, tab: :scheduled)]
+        when :enqueue then [model, AlterSetRows.new(set_class_name: "Sidekiq::ScheduledSet", ids: message.ids, action_name: :add_to_queue, tab: :scheduled)]
+        when :kill    then [model, AlterSetRows.new(set_class_name: "Sidekiq::ScheduledSet", ids: message.ids, action_name: :kill, tab: :scheduled)]
         else model
         end
       }
+      intercept_instances_of TableFragment::ActionRequested, HandleAction
 
-      receive_instances_of ScheduledFetched, SetBehavior::ApplySetData
+      # Outward: intercept pagination bubbles from SetFragment
+      HandleFetch = ->(message, model) {
+        [model, FetchScheduledSet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
+      }
+      intercept_instances_of SetFragment::FetchRequested, HandleFetch
 
       Update = from_router
     end
