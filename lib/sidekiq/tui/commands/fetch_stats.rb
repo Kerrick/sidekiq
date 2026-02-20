@@ -1,0 +1,26 @@
+# frozen_string_literal: true
+
+module Sidekiq
+  module TUI
+    StatsFetched = Data.define(:stats, :redis_url) do
+      include Rooibos::Message::Predicates
+    end
+
+    class FetchStats < Data.define
+      include Rooibos::Command::Custom
+
+      def call(out, _token)
+        raw = Sidekiq::Stats.new
+        stats = Stats.new(
+          processed: raw.processed, failed: raw.failed, busy: raw.workers_size,
+          enqueued: raw.enqueued, retries: raw.retry_size,
+          scheduled: raw.scheduled_size, dead: raw.dead_size
+        )
+        redis_url = Sidekiq.redis { |conn| conn.config.server_url } rescue "N/A"
+        out.put(Ractor.make_shareable(StatsFetched.new(stats:, redis_url:)))
+      rescue => error
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
+      end
+    end
+  end
+end
