@@ -5,6 +5,12 @@ module Sidekiq
     module BusyTab
       include Rooibos::Router
 
+      Controls = [
+        TabControl.new(key: :shift_T, semantic: :terminate, display_key: "T", description: "Terminate"),
+        TabControl.new(key: :shift_Q, semantic: :quiet, display_key: "Q", description: "Quiet")
+      ]
+      FetchCommand = ->(_model) { [FetchProcesses.new] }
+
       Model = Data.define(:table, :processes, :work_set_size)
 
       Init = -> {

@@ -21,7 +21,10 @@ require_relative "tui/commands"
 require_relative "tui/tabs/home_tab"
 require_relative "tui/tabs/busy_tab"
 require_relative "tui/tabs/queues_tab"
-require_relative "tui/tabs/set_tab"
+require_relative "tui/tabs/set_behavior"
+require_relative "tui/tabs/scheduled_tab"
+require_relative "tui/tabs/retries_tab"
+require_relative "tui/tabs/dead_tab"
 require_relative "tui/tabs/metrics_tab"
 
 DebugLogger = Logger.new("tui.log")
@@ -35,6 +38,11 @@ module Sidekiq
 
     REFRESH_INTERVAL = 2.0
 
+    TAB_MODULES = {
+      home: HomeTab, busy: BusyTab, queues: QueuesTab, scheduled: ScheduledTab,
+      retries: RetriesTab, dead: DeadTab, metrics: MetricsTab
+    }
+
     Model = Data.define(
       :active_tab, :showing, :stats, :redis_url, :error,
       :home, :busy, :queues, :scheduled, :retries, :dead, :metrics
@@ -47,12 +55,9 @@ module Sidekiq
         home: HomeTab::Init[],
         busy: BusyTab::Init[],
         queues: QueuesTab::Init[],
-        scheduled: SetTab::Init[tab_name: :scheduled, set_class_name: "Sidekiq::ScheduledSet",
-                                allowed_actions: %i[delete add_to_queue kill]],
-        retries: SetTab::Init[tab_name: :retries, set_class_name: "Sidekiq::RetrySet",
-                              allowed_actions: %i[delete retry kill]],
-        dead: SetTab::Init[tab_name: :dead, set_class_name: "Sidekiq::DeadSet",
-                           allowed_actions: %i[delete add_to_queue]],
+        scheduled: ScheduledTab::Init[],
+        retries: RetriesTab::Init[],
+        dead: DeadTab::Init[],
         metrics: MetricsTab::Init[]
       )
       [model, Rooibos::Command.batch(FetchStats.new, FetchRedisInfo.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
@@ -67,9 +72,9 @@ module Sidekiq
     route :home, to: HomeTab
     route :busy, to: BusyTab
     route :queues, to: QueuesTab
-    route :scheduled, to: SetTab
-    route :retries, to: SetTab
-    route :dead, to: SetTab
+    route :scheduled, to: ScheduledTab
+    route :retries, to: RetriesTab
+    route :dead, to: DeadTab
     route :metrics, to: MetricsTab
 
     # --- Help overlay (modal — swallows all events) ---
@@ -130,9 +135,11 @@ module Sidekiq
       [model, FetchCommandFor[model, model.active_tab]]
     }
 
-    # --- Filtering modal: when active, forward raw events to the set tab ---
+    # --- Filtering modal: when active, forward raw events to the active set tab ---
 
-    FILTERING = ->(_, model) { SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).filtering }
+    FILTERING = ->(_, model) {
+      SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).filtering
+    }
 
     only when: FILTERING do
       otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
@@ -142,74 +149,43 @@ module Sidekiq
 
     # --- Semantic key→message forwarding to active tab ---
 
-    class TabControl < Data.define(:key, :semantic, :display_key, :description); end
-
     SHARED_TABLE_KEYS = { j: :row_down, k: :row_up, x: :toggle_select, shift_A: :toggle_select_all,
                           h: :prev_page, l: :next_page }
     SHARED_TABLE_DISPLAY = [["h/l", "Prev/Next Page"], ["j/k", "Prev/Next Row"],
                             ["x", "Select"], ["A", "Select All"]]
 
-    BUSY_CONTROLS = [
-      TabControl.new(key: :shift_T, semantic: :terminate, display_key: "T", description: "Terminate"),
-      TabControl.new(key: :shift_Q, semantic: :quiet, display_key: "Q", description: "Quiet")
-    ]
-
-    QUEUES_CONTROLS = [
-      TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: "D", description: "Delete"),
-      TabControl.new(key: :p, semantic: :toggle_pause, display_key: "p", description: "Pause/Unpause")
-    ]
-
-    SET_CONTROLS = {
-      delete:  TabControl.new(key: :shift_D, semantic: :delete,  display_key: "D", description: "Delete"),
-      retry:   TabControl.new(key: :shift_R, semantic: :retry,   display_key: "R", description: "Retry"),
-      enqueue: TabControl.new(key: :shift_E, semantic: :enqueue, display_key: "E", description: "Enqueue"),
-      kill:    TabControl.new(key: :shift_K, semantic: :kill,     display_key: "K", description: "Kill"),
-      filter:  TabControl.new(key: :"/",     semantic: :start_filter, display_key: "/", description: "Filter")
-    }
-
-    SCHEDULED_CONTROLS = [SET_CONTROLS[:delete], SET_CONTROLS[:enqueue], SET_CONTROLS[:kill], SET_CONTROLS[:filter]]
-    RETRIES_CONTROLS   = [SET_CONTROLS[:delete], SET_CONTROLS[:retry], SET_CONTROLS[:kill], SET_CONTROLS[:filter]]
-    DEAD_CONTROLS      = [SET_CONTROLS[:delete], SET_CONTROLS[:enqueue], SET_CONTROLS[:filter]]
-
-    TAB_CONTROLS = { busy: BUSY_CONTROLS, queues: QUEUES_CONTROLS,
-                     scheduled: SCHEDULED_CONTROLS, retries: RETRIES_CONTROLS, dead: DEAD_CONTROLS }
-
     only when: ->(_, model) { model.active_tab == :busy } do
       route_to :busy do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        BUSY_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
+        BusyTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
     only when: ->(_, model) { model.active_tab == :queues } do
       route_to :queues do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        QUEUES_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
+        QueuesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    SCHEDULED_NOT_FILTERING = ->(_, model) { model.active_tab == :scheduled && !model.scheduled.filtering }
-    RETRIES_NOT_FILTERING   = ->(_, model) { model.active_tab == :retries && !model.retries.filtering }
-    DEAD_NOT_FILTERING      = ->(_, model) { model.active_tab == :dead && !model.dead.filtering }
-
-    only when: SCHEDULED_NOT_FILTERING do
+    only when: ->(_, model) { model.active_tab == :scheduled && !model.scheduled.filtering } do
       route_to :scheduled do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        SCHEDULED_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
+        ScheduledTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: RETRIES_NOT_FILTERING do
+    only when: ->(_, model) { model.active_tab == :retries && !model.retries.filtering } do
       route_to :retries do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        RETRIES_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
+        RetriesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: DEAD_NOT_FILTERING do
+    only when: ->(_, model) { model.active_tab == :dead && !model.dead.filtering } do
       route_to :dead do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        DEAD_CONTROLS.each { |control| forward_events control.key, as: control.semantic }
+        DeadTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
@@ -218,37 +194,20 @@ module Sidekiq
     # --- Helper lambdas ---
 
     FetchCommandFor = ->(model, tab) {
-      shared = FetchStats.new
-      tab_commands = case tab
-        when :home then [FetchRedisInfo.new]
-        when :busy then [FetchProcesses.new]
-        when :queues then [FetchQueues.new]
-        when :scheduled
-          [FetchScheduledSet.new(filter: model.scheduled.filter, pager_page: model.scheduled.pager.page,
-                                 pager_size: model.scheduled.pager.size)]
-        when :retries
-          [FetchRetrySet.new(filter: model.retries.filter, pager_page: model.retries.pager.page,
-                             pager_size: model.retries.pager.size)]
-        when :dead
-          [FetchDeadSet.new(filter: model.dead.filter, pager_page: model.dead.pager.page,
-                            pager_size: model.dead.pager.size)]
-        when :metrics then [FetchJobMetrics.new]
-        else []
-      end
-      Rooibos::Command.batch(shared, *tab_commands)
+      tab_model = model.public_send(tab)
+      tab_module = TAB_MODULES[tab]
+      Rooibos::Command.batch(FetchStats.new, *tab_module::FetchCommand[tab_model])
     }
 
-    ControlsForTab = ->(tab) {
+    ControlsForTab = ->(model) {
+      tab = model.active_tab
+      tab_module = TAB_MODULES[tab]
       common = [["?", "Help"], ["←/→", "Select Tab"], ["q", "Quit"]]
-      return common if tab == :home || tab == :metrics
+      tab_controls = tab_module::Controls
+      return common if tab_controls.empty?
 
-      tab_display = (TAB_CONTROLS[tab] || []).map { |control| [control.display_key, control.description] }
+      tab_display = tab_controls.map { |control| [control.display_key, control.description] }
       common + SHARED_TABLE_DISPLAY + tab_display
-    }
-
-    TAB_MODULES = {
-      home: HomeTab, busy: BusyTab, queues: QueuesTab, scheduled: SetTab,
-      retries: SetTab, dead: SetTab, metrics: MetricsTab
     }
 
     RenderMain = ->(model, tui) {
@@ -265,7 +224,7 @@ module Sidekiq
         TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui, stats: model.stats]
       end
 
-      spans = ControlsForTab[model.active_tab].flat_map { |key, desc|
+      spans = ControlsForTab[model].flat_map { |key, desc|
         [tui.text_span(content: key, style: Views::HOTKEY_STYLE), tui.text_span(content: ": #{desc}  ")]
       }
       controls = tui.paragraph(

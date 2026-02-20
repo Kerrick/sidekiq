@@ -3,6 +3,8 @@
 module Sidekiq
   module TUI
     module HomeTab
+      Controls = []
+      FetchCommand = ->(_model) { [FetchRedisInfo.new] }
       Model = Data.define(
         :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info

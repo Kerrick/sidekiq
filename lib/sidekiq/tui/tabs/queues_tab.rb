@@ -5,6 +5,12 @@ module Sidekiq
     module QueuesTab
       include Rooibos::Router
 
+      Controls = [
+        TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: "D", description: "Delete"),
+        TabControl.new(key: :p, semantic: :toggle_pause, display_key: "p", description: "Pause/Unpause")
+      ]
+      FetchCommand = ->(_model) { [FetchQueues.new] }
+
       Model = Data.define(:table, :queues, :pro)
       Init = -> { Ractor.make_shareable Model.new(table: EMPTY_TABLE, queues: [], pro: false) }
 

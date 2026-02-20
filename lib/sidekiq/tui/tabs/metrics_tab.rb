@@ -3,6 +3,8 @@
 module Sidekiq
   module TUI
     module MetricsTab
+      Controls = []
+      FetchCommand = ->(_model) { [FetchJobMetrics.new] }
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
       Model = Data.define(:datasets, :starts_at, :ends_at, :metrics_refresh_at)

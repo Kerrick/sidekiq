@@ -20,6 +20,9 @@ module Sidekiq
     # Raw queue data returned by Commands.
     class QueueData < Data.define(:name, :size, :latency, :paused); end
 
+    # Couples a key binding with its semantic name and display label.
+    class TabControl < Data.define(:key, :semantic, :display_key, :description); end
+
     EMPTY_TABLE = Ractor.make_shareable(
       TableState.new(rows: [], row_ids: [], selected: [], selected_row_index: 0)
     )
