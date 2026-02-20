@@ -2,7 +2,6 @@
 
 module Sidekiq
   module TUI
-    # Queues tab fragment. Receives semantic messages from root Router.
     module QueuesTab
       include Rooibos::Router
 
@@ -25,20 +24,20 @@ module Sidekiq
       receive_routed :delete_queue, ->(_, model) {
         ids = model.table.action_ids
         return model if ids.empty?
-        cmds = ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
-        [model.with(table: ClearSelection[model.table]), cmds.size == 1 ? cmds.first : Rooibos::Command.batch(*cmds)]
+        commands = ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
+        [model.with(table: ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :toggle_pause, ->(_, model) {
         ids = model.table.action_ids
         return model if ids.empty?
-        cmds = ids.map { |qname| TogglePauseQueue.new(queue_name: qname, tab: :queues) }
-        [model, cmds.size == 1 ? cmds.first : Rooibos::Command.batch(*cmds)]
+        commands = ids.map { |qname| TogglePauseQueue.new(queue_name: qname, tab: :queues) }
+        [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
-      receive_instances_of DataFetched, ->(msg, model) {
-        new_table = model.table.with(rows: msg.tab_data[:rows], row_ids: msg.tab_data[:row_ids])
-        model.with(table: new_table, pro: msg.tab_data[:pro] || false)
+      receive_instances_of DataFetched, ->(message, model) {
+        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
+        model.with(table: new_table, pro: message.tab_data[:pro] || false)
       }
 
       Update = from_router

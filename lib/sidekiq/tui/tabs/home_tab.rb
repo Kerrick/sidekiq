@@ -2,7 +2,6 @@
 
 module Sidekiq
   module TUI
-    # Home tab fragment. No table, just stats + chart + Redis info.
     module HomeTab
       Model = Data.define(
         :chart_deltas_processed, :chart_deltas_failed,
@@ -11,11 +10,10 @@ module Sidekiq
 
       Init = -> {
         Ractor.make_shareable Model.new(
-          chart_deltas_processed: Array.new(50, 0).freeze,
-          chart_deltas_failed: Array.new(50, 0).freeze,
+          chart_deltas_processed: Array.new(50, 0),
+          chart_deltas_failed: Array.new(50, 0),
           previous_processed: 0, previous_failed: 0,
-          redis_info: { version: "N/A", uptime_days: "N/A", connected_clients: "N/A",
-                        used_memory: "N/A", peak_memory: "N/A" }.freeze
+          redis_info: EMPTY_REDIS_INFO
         )
       }
 
@@ -29,15 +27,15 @@ module Sidekiq
 
       Update = ->(message, model) {
         case message
-        in DataFetched => msg
-          pd = msg.tab_data[:processed] - model.previous_processed
-          fd = msg.tab_data[:failed] - model.previous_failed
+        in DataFetched
+          pd = message.tab_data[:processed] - model.previous_processed
+          fd = message.tab_data[:failed] - model.previous_failed
           model.with(
-            chart_deltas_processed: (model.chart_deltas_processed[1..] + [pd]).freeze,
-            chart_deltas_failed: (model.chart_deltas_failed[1..] + [fd]).freeze,
-            previous_processed: msg.tab_data[:processed],
-            previous_failed: msg.tab_data[:failed],
-            redis_info: msg.tab_data[:redis_info]
+            chart_deltas_processed: model.chart_deltas_processed[1..] + [pd],
+            chart_deltas_failed: model.chart_deltas_failed[1..] + [fd],
+            previous_processed: message.tab_data[:processed],
+            previous_failed: message.tab_data[:failed],
+            redis_info: message.tab_data[:redis_info]
           )
         else
           model
@@ -63,10 +61,10 @@ module Sidekiq
       }
 
       RenderRedis = ->(redis_info, tui) {
-        uptime = (redis_info[:uptime_days] == "N/A") ? "N/A" : "#{redis_info[:uptime_days]} days"
+        uptime = (redis_info.uptime_days == "N/A") ? "N/A" : "#{redis_info.uptime_days} days"
         keys = ["Version", "Uptime", "Connected Clients", "Memory Usage", "Peak Memory"]
-        vals = [redis_info[:version], uptime, redis_info[:connected_clients],
-                redis_info[:used_memory], redis_info[:peak_memory]]
+        vals = [redis_info.version, uptime, redis_info.connected_clients,
+                redis_info.used_memory, redis_info.peak_memory]
         tui.paragraph(
           text: [keys.map { |k| k.ljust(18) }.join("  "), vals.map { |v| v.to_s.ljust(18) }.join("  ")],
           block: tui.block(title: "Redis Information", borders: [:all])

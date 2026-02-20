@@ -72,7 +72,7 @@ module Sidekiq
 
     # --- Help overlay (modal — swallows all events) ---
 
-    only when: ->(_, m) { m.showing == :help } do
+    only when: ->(_, model) { model.showing == :help } do
       receive_events :esc, ->(_, model) { model.with(showing: :main) }
       receive_all ->(_, model) { model }
     end
@@ -106,21 +106,21 @@ module Sidekiq
 
     # --- Data fetch results ---
 
-    observe_instances_of DataFetched, ->(msg, model) {
-      model.with(stats: msg.stats, redis_url: msg.redis_url, error: nil)
+    observe_instances_of DataFetched, ->(message, model) {
+      model.with(stats: message.stats, redis_url: message.redis_url, error: nil)
     }
 
-    forward_instances_of DataFetched, to: :home, when: ->(msg, _) { msg.tab == :home }
-    forward_instances_of DataFetched, to: :busy, when: ->(msg, _) { msg.tab == :busy }
-    forward_instances_of DataFetched, to: :queues, when: ->(msg, _) { msg.tab == :queues }
-    forward_instances_of DataFetched, to: :scheduled, when: ->(msg, _) { msg.tab == :scheduled }
-    forward_instances_of DataFetched, to: :retries, when: ->(msg, _) { msg.tab == :retries }
-    forward_instances_of DataFetched, to: :dead, when: ->(msg, _) { msg.tab == :dead }
-    forward_instances_of DataFetched, to: :metrics, when: ->(msg, _) { msg.tab == :metrics }
+    forward_instances_of DataFetched, to: :home, when: ->(message, _) { message.tab == :home }
+    forward_instances_of DataFetched, to: :busy, when: ->(message, _) { message.tab == :busy }
+    forward_instances_of DataFetched, to: :queues, when: ->(message, _) { message.tab == :queues }
+    forward_instances_of DataFetched, to: :scheduled, when: ->(message, _) { message.tab == :scheduled }
+    forward_instances_of DataFetched, to: :retries, when: ->(message, _) { message.tab == :retries }
+    forward_instances_of DataFetched, to: :dead, when: ->(message, _) { message.tab == :dead }
+    forward_instances_of DataFetched, to: :metrics, when: ->(message, _) { message.tab == :metrics }
 
-    receive_instances_of DataFetchError, ->(msg, model) {
-      log("DataFetchError: #{msg.error_message}", *Array(msg.backtrace))
-      model.with(error: msg.error_message)
+    receive_instances_of DataFetchError, ->(message, model) {
+      log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
+      model.with(error: message.error_message)
     }
 
     receive_instances_of ActionComplete, ->(_, model) {
@@ -128,46 +128,41 @@ module Sidekiq
     }
 
     # --- Filtering modal: when active, forward raw events to the set tab ---
-    # Must come BEFORE the semantic key forwards (first match wins).
 
-    FILTERING = ->(_, m) { SET_TABS.include?(m.active_tab) && m.public_send(m.active_tab).filtering }
+    FILTERING = ->(_, model) { SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).filtering }
 
     only when: FILTERING do
-      otherwise route_to: :scheduled, when: ->(_, m) { m.active_tab == :scheduled }
-      otherwise route_to: :retries, when: ->(_, m) { m.active_tab == :retries }
-      otherwise route_to: :dead, when: ->(_, m) { m.active_tab == :dead }
+      otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
+      otherwise route_to: :retries, when: ->(_, model) { model.active_tab == :retries }
+      otherwise route_to: :dead, when: ->(_, model) { model.active_tab == :dead }
     end
 
     # --- Semantic key→message forwarding to active tab ---
-    # Keybinding knowledge lives HERE ONLY. Tabs never see raw keys.
 
     SHARED_TABLE_KEYS = { j: :row_down, k: :row_up, x: :toggle_select, shift_A: :toggle_select_all,
-                          h: :prev_page, l: :next_page }.freeze
+                          h: :prev_page, l: :next_page }
 
-    # Busy tab
-    only when: ->(_, m) { m.active_tab == :busy } do
+    only when: ->(_, model) { model.active_tab == :busy } do
       route_to :busy do
-        SHARED_TABLE_KEYS.each { |key, msg| forward_events key, as: msg }
+        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         forward_events :shift_T, as: :terminate
         forward_events :shift_Q, as: :quiet
       end
     end
 
-    # Queues tab
-    only when: ->(_, m) { m.active_tab == :queues } do
+    only when: ->(_, model) { model.active_tab == :queues } do
       route_to :queues do
-        SHARED_TABLE_KEYS.each { |key, msg| forward_events key, as: msg }
+        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         forward_events :shift_D, as: :delete_queue
         forward_events :p, as: :toggle_pause
       end
     end
 
-    # Set tabs (when NOT filtering — filtering modal handles raw events above)
     %i[scheduled retries dead].each do |tab|
-      not_filtering = ->(_, m) { m.active_tab == tab && !m.public_send(tab).filtering }
+      not_filtering = ->(_, model) { model.active_tab == tab && !model.public_send(tab).filtering }
       only when: not_filtering do
         route_to tab do
-          SHARED_TABLE_KEYS.each { |key, msg| forward_events key, as: msg }
+          SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
           forward_events :shift_D, as: :delete
           forward_events :shift_R, as: :retry
           forward_events :shift_E, as: :enqueue
@@ -215,11 +210,11 @@ module Sidekiq
     TAB_MODULES = {
       home: HomeTab, busy: BusyTab, queues: QueuesTab, scheduled: SetTab,
       retries: SetTab, dead: SetTab, metrics: MetricsTab
-    }.freeze
+    }
 
     RenderMain = ->(model, tui) {
       tab_bar = tui.tabs(
-        titles: TAB_ORDER.map { |t| TAB_NAMES[t] },
+        titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
         selected_index: TAB_ORDER.index(model.active_tab),
         block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: TITLE_STYLE),
         divider: " | ", highlight_style: HIGHLIGHT_STYLE
@@ -248,7 +243,7 @@ module Sidekiq
       )
     }
 
-    RenderHelp = ->(_model, tui) {
+    RenderHelp = ->(_, tui) {
       help_lines = [["Esc", "Close"], ["←/→", "Move between tabs"],
                     ["j/k", "Prev/next row"], ["x", "Select/deselect current row"],
                     ["A", "Select/deselect All"], ["h/l", "Prev/next page"], ["q", "Quit"]]

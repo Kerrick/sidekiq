@@ -2,17 +2,13 @@
 
 module Sidekiq
   module TUI
-    # Busy tab fragment. Receives semantic messages from root Router.
     module BusyTab
       include Rooibos::Router
 
       Model = Data.define(:table, :status)
 
       Init = -> {
-        Ractor.make_shareable Model.new(
-          table: EMPTY_TABLE,
-          status: { processes: "0", threads: "0", busy: "0", utilization: "0%", rss: "0" }.freeze
-        )
+        Ractor.make_shareable Model.new(table: EMPTY_TABLE, status: EMPTY_BUSY_STATUS)
       }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
@@ -23,34 +19,33 @@ module Sidekiq
         )
       }
 
-      # Semantic messages from root
       receive_routed :row_down, RowDown
       receive_routed :row_up, RowUp
       receive_routed :toggle_select, ToggleSelect
       receive_routed :toggle_select_all, ToggleSelectAll
 
       receive_routed :terminate, ->(_, model) {
-        cmds = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
-        return model if cmds.empty?
-        [model.with(table: ClearSelection[model.table]), cmds.size == 1 ? cmds.first : Rooibos::Command.batch(*cmds)]
+        commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
+        return model if commands.empty?
+        [model.with(table: ClearSelection[model.table]), commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
       receive_routed :quiet, ->(_, model) {
-        cmds = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :quiet, tab: :busy) }
-        return model if cmds.empty?
-        [model, cmds.size == 1 ? cmds.first : Rooibos::Command.batch(*cmds)]
+        commands = model.table.action_ids.map { |id| SignalProcess.new(identity: id, signal: :quiet, tab: :busy) }
+        return model if commands.empty?
+        [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
       }
 
-      receive_instances_of DataFetched, ->(msg, model) {
-        new_table = model.table.with(rows: msg.tab_data[:rows], row_ids: msg.tab_data[:row_ids])
-        model.with(table: new_table, status: msg.tab_data[:status])
+      receive_instances_of DataFetched, ->(message, model) {
+        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
+        model.with(table: new_table, status: message.tab_data[:status])
       }
 
       Update = from_router
 
       RenderStatus = ->(status, tui) {
         keys = %w[Processes Threads Busy Utilization RSS]
-        vals = [status[:processes], status[:threads], status[:busy], status[:utilization], status[:rss]]
+        vals = [status.processes, status.threads, status.busy, status.utilization, status.rss]
         tui.paragraph(
           text: [keys.map { |k| k.ljust(12) }.join("  "), vals.map { |v| v.to_s.ljust(12) }.join("  ")],
           block: tui.block(title: "Status", borders: [:all])

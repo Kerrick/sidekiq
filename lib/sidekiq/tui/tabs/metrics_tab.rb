@@ -2,14 +2,13 @@
 
 module Sidekiq
   module TUI
-    # Metrics tab fragment. No table interaction, just data display.
     module MetricsTab
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
       Model = Data.define(:datasets, :starts_at, :ends_at, :metrics_refresh_at)
 
       Init = -> {
-        Ractor.make_shareable Model.new(datasets: [].freeze, starts_at: "", ends_at: "", metrics_refresh_at: nil)
+        Ractor.make_shareable Model.new(datasets: [], starts_at: "", ends_at: "", metrics_refresh_at: nil)
       }
 
       View = ->(model, tui, stats: EMPTY_STATS) {
@@ -22,9 +21,9 @@ module Sidekiq
 
       Update = ->(message, model) {
         case message
-        in DataFetched => msg
-          model.with(datasets: msg.tab_data[:datasets], starts_at: msg.tab_data[:starts_at],
-                     ends_at: msg.tab_data[:ends_at], metrics_refresh_at: Time.now + 60)
+        in DataFetched
+          model.with(datasets: message.tab_data[:datasets], starts_at: message.tab_data[:starts_at],
+                     ends_at: message.tab_data[:ends_at], metrics_refresh_at: Time.now + 60)
         else
           model
         end

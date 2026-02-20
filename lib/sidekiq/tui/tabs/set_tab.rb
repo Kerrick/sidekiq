@@ -4,7 +4,6 @@ module Sidekiq
   module TUI
     # Reusable set tab fragment — one module, three routes (scheduled, retries, dead).
     # Configurable via model fields (tab_name, set_class_name, allowed_actions).
-    # Like Panel in the tabbed_fragments example: parameterized Init, shared Router.
     module SetTab
       include Rooibos::Router
 
@@ -14,7 +13,7 @@ module Sidekiq
       Init = ->(tab_name:, set_class_name:, allowed_actions:) {
         Ractor.make_shareable Model.new(
           table: EMPTY_TABLE, pager: EMPTY_PAGER, filter: nil, filtering: false,
-          tab_name:, set_class_name:, allowed_actions: allowed_actions.freeze
+          tab_name:, set_class_name:, allowed_actions:
         )
       }
 
@@ -64,36 +63,36 @@ module Sidekiq
 
       receive_routed :start_filter, ->(_, model) { model.with(filtering: true, filter: "") }
 
-      # --- Guarded destructive actions (allowed_actions check) ---
+      # --- Guarded destructive actions ---
 
-      ALLOWS_DELETE  = ->(_, m) { m.allowed_actions.include?(:delete) }
-      ALLOWS_RETRY   = ->(_, m) { m.allowed_actions.include?(:retry) }
-      ALLOWS_ENQUEUE = ->(_, m) { m.allowed_actions.include?(:add_to_queue) }
-      ALLOWS_KILL    = ->(_, m) { m.allowed_actions.include?(:kill) }
+      ALLOWS_DELETE  = ->(_, model) { model.allowed_actions.include?(:delete) }
+      ALLOWS_RETRY   = ->(_, model) { model.allowed_actions.include?(:retry) }
+      ALLOWS_ENQUEUE = ->(_, model) { model.allowed_actions.include?(:add_to_queue) }
+      ALLOWS_KILL    = ->(_, model) { model.allowed_actions.include?(:kill) }
 
-      MakeAlterCmd = ->(model, action_name) {
+      MakeAlterCommand = ->(model, action_name) {
         ids = model.table.action_ids
         return model if ids.empty?
-        cmd = AlterSetRows.new(set_class_name: model.set_class_name, ids: ids.freeze,
-                               action_name:, tab: model.tab_name)
-        [model.with(table: ClearSelection[model.table]), cmd]
+        command = AlterSetRows.new(set_class_name: model.set_class_name, ids: ids,
+                                   action_name:, tab: model.tab_name)
+        [model.with(table: ClearSelection[model.table]), command]
       }
 
-      receive_routed :delete,  ->(_, model) { MakeAlterCmd[model, :delete] },  when: ALLOWS_DELETE
-      receive_routed :retry,   ->(_, model) { MakeAlterCmd[model, :retry] },   when: ALLOWS_RETRY
-      receive_routed :enqueue, ->(_, model) { MakeAlterCmd[model, :add_to_queue] }, when: ALLOWS_ENQUEUE
-      receive_routed :kill,    ->(_, model) { MakeAlterCmd[model, :kill] },     when: ALLOWS_KILL
+      receive_routed :delete,  ->(_, model) { MakeAlterCommand[model, :delete] },      when: ALLOWS_DELETE
+      receive_routed :retry,   ->(_, model) { MakeAlterCommand[model, :retry] },       when: ALLOWS_RETRY
+      receive_routed :enqueue, ->(_, model) { MakeAlterCommand[model, :add_to_queue] }, when: ALLOWS_ENQUEUE
+      receive_routed :kill,    ->(_, model) { MakeAlterCommand[model, :kill] },         when: ALLOWS_KILL
 
       # --- Filtering modal: raw events forwarded by root when filtering is active ---
 
-      FILTERING_ACTIVE = ->(_, m) { m.filtering }
+      FILTERING_ACTIVE = ->(_, model) { model.filtering }
 
       only when: FILTERING_ACTIVE do
-        receive ->(msg, _) { msg.respond_to?(:text?) && msg.text? && msg.code.length == 1 },
-          ->(msg, model) { model.with(filter: "#{model.filter}#{msg.code}".freeze) }
+        receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
+          ->(message, model) { model.with(filter: "#{model.filter}#{message.code}") }
 
         receive_events :backspace, ->(_, model) {
-          model.with(filter: (model.filter || "").chop.freeze)
+          model.with(filter: (model.filter || "").chop)
         }
 
         receive_events :enter, ->(_, model) {
@@ -107,11 +106,11 @@ module Sidekiq
 
       # --- Data integration ---
 
-      receive_instances_of DataFetched, ->(msg, model) {
-        new_table = model.table.with(rows: msg.tab_data[:rows], row_ids: msg.tab_data[:row_ids])
+      receive_instances_of DataFetched, ->(message, model) {
+        new_table = model.table.with(rows: message.tab_data[:rows], row_ids: message.tab_data[:row_ids])
         new_pager = model.pager.with(
-          current_page: msg.tab_data[:current_page], total: msg.tab_data[:total],
-          next_page: msg.tab_data[:next_page], page: msg.tab_data[:pager_page], size: msg.tab_data[:pager_size]
+          current_page: message.tab_data[:current_page], total: message.tab_data[:total],
+          next_page: message.tab_data[:next_page], page: message.tab_data[:pager_page], size: message.tab_data[:pager_size]
         )
         model.with(table: new_table, pager: new_pager)
       }
