@@ -44,33 +44,26 @@ module Sidekiq
 
       # --- Filtering ---
 
-      StartFilter = ->(_, model) {
+      receive_routed :start_filter, ->(_, model) {
         DebugLogger.info("SetFragment StartFilter")
         model.with(filtering: true, filter: "")
       }
-      IsFiltering = ->(_, model) { model.filtering }
-      IsTextInput = ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 }
-      AppendChar = ->(message, model) {
-        DebugLogger.info("SetFragment AppendChar: #{message.code}")
-        model.with(filter: "#{model.filter}#{message.code}")
-      }
-      Backspace = ->(_, model) { model.with(filter: (model.filter || "").chop) }
-      SubmitFilter = ->(_, model) {
-        DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
-        model.with(filtering: false)
-      }
-      CancelFilter = ->(_, model) {
-        DebugLogger.info("SetFragment CancelFilter")
-        model.with(filtering: false, filter: nil)
-      }
 
-      receive_routed :start_filter, StartFilter
-
-      only when: IsFiltering do
-        receive IsTextInput, AppendChar
-        receive_events :backspace, Backspace
-        receive_events :enter, SubmitFilter
-        receive_events :esc, CancelFilter
+      only when: ->(_, model) { model.filtering } do
+        receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
+          ->(message, model) {
+            DebugLogger.info("SetFragment AppendChar: #{message.code}")
+            model.with(filter: "#{model.filter}#{message.code}")
+          }
+        receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || "").chop) }
+        receive_events :enter, ->(_, model) {
+          DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
+          model.with(filtering: false)
+        }
+        receive_events :esc, ->(_, model) {
+          DebugLogger.info("SetFragment CancelFilter")
+          model.with(filtering: false, filter: nil)
+        }
       end
 
       # --- Pagination (bubbles FetchRequested for parent to intercept) ---

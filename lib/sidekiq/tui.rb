@@ -79,13 +79,9 @@ module Sidekiq
 
     # --- Help overlay (modal — swallows all events) ---
 
-    ShowingHelp = ->(_, model) { model.showing == :help }
-    CloseHelp = ->(_, model) { model.with(showing: :main) }
-    Swallow = ->(_, model) { model }
-
-    only when: ShowingHelp do
-      receive_events :esc, CloseHelp
-      receive_all Swallow
+    only when: ->(_, model) { model.showing == :help } do
+      receive_events :esc, ->(_, model) { model.with(showing: :main) }
+      receive_all ->(_, model) { model }
     end
 
     # --- Global keys ---
@@ -147,51 +143,48 @@ module Sidekiq
     SHARED_TABLE_DISPLAY = [["h/l", "Prev/Next Page"], ["j/k", "Prev/Next Row"],
                             ["x", "Select"], ["A", "Select All"]]
 
-    IsBusy      = ->(_, model) { model.active_tab == :busy }
-    IsQueues    = ->(_, model) { model.active_tab == :queues }
-    IsScheduled = ->(_, model) { model.active_tab == :scheduled && !model.scheduled.set.filtering }
-    IsRetries   = ->(_, model) { model.active_tab == :retries && !model.retries.set.filtering }
-    IsDead      = ->(_, model) { model.active_tab == :dead && !model.dead.set.filtering }
-
-    # When a set tab is filtering, forward raw events to it so the
+    # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
-    IsFilteringScheduled = ->(_, model) { model.active_tab == :scheduled && model.scheduled.set.filtering }
-    IsFilteringRetries   = ->(_, model) { model.active_tab == :retries && model.retries.set.filtering }
-    IsFilteringDead      = ->(_, model) { model.active_tab == :dead && model.dead.set.filtering }
+    SET_TABS = %i[scheduled retries dead].freeze
+    IsSetFiltering = ->(_, model) {
+      SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filtering
+    }
 
-    otherwise route_to: :scheduled, when: IsFilteringScheduled
-    otherwise route_to: :retries, when: IsFilteringRetries
-    otherwise route_to: :dead, when: IsFilteringDead
+    only when: IsSetFiltering do
+      otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
+      otherwise route_to: :retries,   when: ->(_, model) { model.active_tab == :retries }
+      otherwise route_to: :dead,      when: ->(_, model) { model.active_tab == :dead }
+    end
 
-    only when: IsBusy do
+    only when: ->(_, model) { model.active_tab == :busy } do
       route_to :busy do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         BusyTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: IsQueues do
+    only when: ->(_, model) { model.active_tab == :queues } do
       route_to :queues do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         QueuesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: IsScheduled do
+    only when: ->(_, model) { model.active_tab == :scheduled && !model.scheduled.set.filtering } do
       route_to :scheduled do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         ScheduledTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: IsRetries do
+    only when: ->(_, model) { model.active_tab == :retries && !model.retries.set.filtering } do
       route_to :retries do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         RetriesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
       end
     end
 
-    only when: IsDead do
+    only when: ->(_, model) { model.active_tab == :dead && !model.dead.set.filtering } do
       route_to :dead do
         SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
         DeadTab::Controls.each { |control| forward_events control.key, as: control.semantic }

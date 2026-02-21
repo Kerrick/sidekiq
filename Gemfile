@@ -13,7 +13,7 @@ gem "railties", RAILS_VERSION
 gem "redis-client"
 # gem "bumbler"
 # gem "debug"
-gem "rooibos"
+gem "rooibos", path: "../rooibos"
 
 gem "sqlite3", "~> 2.2", platforms: :ruby
 gem "activerecord-jdbcsqlite3-adapter", platforms: :jruby
