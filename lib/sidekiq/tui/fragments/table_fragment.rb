@@ -92,7 +92,7 @@ module Sidekiq
           widths: widths,
           column_spacing: 1,
           row_highlight_style: highlight,
-          highlight_symbol: ' ▶ ',
+          highlight_symbol: "➡️",
           selected_row: model.selected_row_index,
           block: tui.block(title: "#{title} (#{count_text})", borders: [:all])
         )
