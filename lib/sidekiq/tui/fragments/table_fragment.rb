@@ -81,7 +81,7 @@ module Sidekiq
       # --- View: renders table widget with configuration from parent ---
 
       View = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil|
-        highlight = tui.style(fg: :cyan, modifiers: [:bold])
+        highlight = tui.style(fg: :white, bg: :blue)
         count_text = "Count: #{model.row_ids.size}"
         count_text += " | Page: #{pager.current_page}" if pager
         count_text += " | Filter: #{filter_state[:filter]}" if filter_state && filter_state[:filter]
