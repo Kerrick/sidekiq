@@ -94,13 +94,15 @@ module Sidekiq
     receive_events :left, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx - 1) % TAB_ORDER.size]
-      [model.with(active_tab: new_tab, error: nil), FetchCommandFor[model, new_tab]]
+      [model.with(active_tab: new_tab, error: nil, new_tab => TAB_MODULES[new_tab]::Init[]),
+       FetchCommandFor[model, new_tab]]
     }
 
     receive_events :right, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx + 1) % TAB_ORDER.size]
-      [model.with(active_tab: new_tab, error: nil), FetchCommandFor[model, new_tab]]
+      [model.with(active_tab: new_tab, error: nil, new_tab => TAB_MODULES[new_tab]::Init[]),
+       FetchCommandFor[model, new_tab]]
     }
 
     # --- Timer ---
