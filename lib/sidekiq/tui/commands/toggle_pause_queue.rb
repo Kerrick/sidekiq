@@ -6,6 +6,8 @@ module Sidekiq
       include Rooibos::Command::Custom
 
       def call(out, _token)
+        return unless Sidekiq.pro?
+
         queue = Sidekiq::Queue.new(queue_name)
         queue.paused? ? queue.unpause! : queue.pause!
         out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :toggle_pause)))
