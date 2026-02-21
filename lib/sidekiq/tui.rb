@@ -129,7 +129,7 @@ module Sidekiq
 
     receive_instances_of DataFetchError, lambda { |message, model|
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
-      model.with(error: message.error_message)
+      model.with(error: message)
     }
 
     receive_instances_of ActionComplete, lambda { |_, model|

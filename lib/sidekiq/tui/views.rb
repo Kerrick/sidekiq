@@ -36,8 +36,14 @@ module Sidekiq
       }
 
       RenderError = lambda { |error, tui|
-        text = error.is_a?(Exception) ? error.message : error.to_s
-        tui.paragraph(text: text, alignment: :center,
+        message = error.respond_to?(:error_message) ? error.error_message : error.to_s
+        backtrace = error.respond_to?(:backtrace) ? Array(error.backtrace) : []
+        header = [tui.text_line(
+          spans: [tui.text_span(content: message, style: RatatuiRuby::Style::Style.new(modifiers: [:bold]))],
+          alignment: :center
+        )]
+        lines = backtrace.map { |line| tui.text_line(spans: [tui.text_span(content: line)]) }
+        tui.paragraph(text: header + lines, alignment: :left,
                       block: tui.block(title: 'Error', borders: [:all], border_style: ERR_BORDER))
       }
     end
