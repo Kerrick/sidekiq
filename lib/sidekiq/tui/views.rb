@@ -7,7 +7,7 @@ module Sidekiq
       HOTKEY_STYLE    = RatatuiRuby::Style::Style.new(modifiers: %i[bold underlined])
       TITLE_STYLE     = RatatuiRuby::Style::Style.new(fg: :red, modifiers: [:bold])
       HIGHLIGHT_STYLE = RatatuiRuby::Style::Style.new(fg: :red, modifiers: [:underlined])
-      ALT_ROW_STYLE   = RatatuiRuby::Style::Style.new(modifiers: [:dim])
+      ALT_ROW_STYLE   = RatatuiRuby::Style::Style.new(bg: :dark_gray)
       ROW_HL_STYLE    = RatatuiRuby::Style::Style.new(fg: :white, bg: :blue)
       FILTER_STYLE    = RatatuiRuby::Style::Style.new(fg: :white, bg: :dark_gray)
       BLINK_STYLE     = RatatuiRuby::Style::Style.new(fg: :white, bg: :dark_gray, modifiers: [:slow_blink])
