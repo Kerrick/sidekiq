@@ -72,8 +72,7 @@ module Sidekiq
 
         action = message.respond_to?(:envelope) ? message.envelope : message
         DebugLogger.info("TableFragment receive_all: message=#{message.class} envelope=#{message.respond_to?(:envelope) ? message.envelope : 'N/A'} action=#{action}")
-        cleared = model.with(selected: [], selected_row_index: 0)
-        [cleared, Rooibos::Command.bubble(ActionRequested.new(envelope: :table, action:, ids:))]
+        [model, Rooibos::Command.bubble(ActionRequested.new(envelope: :table, action:, ids:))]
       }
 
       Update = from_router

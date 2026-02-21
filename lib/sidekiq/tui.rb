@@ -134,9 +134,25 @@ module Sidekiq
       model.with(error: message)
     }
 
-    receive_instances_of ActionComplete, lambda { |_, model|
-      DebugLogger.info("Root ActionComplete: re-fetching tab=#{model.active_tab}")
-      [model, FetchCommandFor[model, model.active_tab]]
+    receive_instances_of ActionComplete, lambda { |message, model|
+      DebugLogger.info("Root ActionComplete: tab=#{message.tab} action=#{message.action} succeeded=#{message.succeeded_ids.size}")
+      tab = message.tab
+      tab_model = model.public_send(tab)
+
+      # Clear succeeded_ids from the nested table's selection.
+      # Set tabs (scheduled/retries/dead) have .set.table; others have .table directly.
+      updated = if tab_model.respond_to?(:set)
+                  old_table = tab_model.set.table
+                  new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+                  model.with(tab => tab_model.with(set: tab_model.set.with(table: new_table)))
+                elsif tab_model.respond_to?(:table)
+                  old_table = tab_model.table
+                  new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+                  model.with(tab => tab_model.with(table: new_table))
+                else
+                  model
+                end
+      [updated, FetchCommandFor[model, model.active_tab]]
     }
 
     # --- Semantic key→message forwarding to active tab ---

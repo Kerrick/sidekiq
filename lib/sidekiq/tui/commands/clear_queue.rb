@@ -2,12 +2,19 @@
 
 module Sidekiq
   module TUI
-    class ClearQueue < Data.define(:queue_name, :tab)
+    class ClearQueue < Data.define(:queue_names, :tab)
       include Rooibos::Command::Custom
 
       def call(out, _token)
-        Sidekiq::Queue.new(queue_name).clear
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :clear)))
+        succeeded_ids = []
+        queue_names.each do |queue_name|
+          Sidekiq::Queue.new(queue_name).clear
+          succeeded_ids << queue_name
+        rescue StandardError => e
+          DebugLogger.info("ClearQueue: failed on #{queue_name}: #{e.message}")
+          break
+        end
+        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :clear, succeeded_ids:)))
       end
     end
   end

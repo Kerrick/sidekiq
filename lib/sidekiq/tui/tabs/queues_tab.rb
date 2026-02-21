@@ -29,11 +29,9 @@ module Sidekiq
         DebugLogger.info("QueuesTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete_queue
-          commands = message.ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }
-          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+          [model, ClearQueue.new(queue_names: message.ids, tab: :queues)]
         when :toggle_pause
-          commands = message.ids.map { |qname| TogglePauseQueue.new(queue_name: qname, tab: :queues) }
-          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+          [model, TogglePauseQueue.new(queue_names: message.ids, tab: :queues)]
         else
           model
         end

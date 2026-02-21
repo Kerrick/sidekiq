@@ -4,7 +4,7 @@ module Sidekiq
   module TUI
     # Shared messages produced by multiple commands.
 
-    class ActionComplete < Data.define(:tab, :action)
+    class ActionComplete < Data.define(:tab, :action, :succeeded_ids)
       include Rooibos::Message::Predicates
     end
 

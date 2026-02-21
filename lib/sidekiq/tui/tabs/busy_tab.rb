@@ -32,11 +32,9 @@ module Sidekiq
         DebugLogger.info("BusyTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :terminate
-          commands = message.ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
-          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+          [model, SignalProcess.new(identities: message.ids, signal: :terminate, tab: :busy)]
         when :quiet
-          commands = message.ids.map { |id| SignalProcess.new(identity: id, signal: :quiet, tab: :busy) }
-          [model, commands.size == 1 ? commands.first : Rooibos::Command.batch(*commands)]
+          [model, SignalProcess.new(identities: message.ids, signal: :quiet, tab: :busy)]
         else
           model
         end
