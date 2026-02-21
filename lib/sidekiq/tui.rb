@@ -81,8 +81,8 @@ module Sidekiq
     # --- Help overlay (modal — swallows all events) ---
 
     only when: ->(_, model) { model.showing == :help } do
-      receive_events :esc, ->(_, model) { model.with(showing: :main) }
-      receive_all ->(_, model) { model }
+      receive_events %i[esc ?], ->(_, model) { model.with(showing: :main) }
+      receive_instances_of RatatuiRuby::Event, ->(_, _) { nil }
     end
 
     # --- Global keys ---
@@ -245,9 +245,9 @@ module Sidekiq
     }
 
     RenderHelp = lambda { |_, tui|
-      help_lines = [['Esc', 'Close'], ['←/→', 'Move between tabs'],
-                    ['j/k', 'Prev/next row'], ['x', 'Select/deselect current row'],
-                    ['A', 'Select/deselect All'], ['h/l', 'Prev/next page'], ['q', 'Quit']]
+      help_lines = [["Esc", "Close"], ["←/→", "Move between tabs"],
+                    ["j/k", "Use vim keys to move to prev/next row"], ["x", "Select/deselect current row"],
+                    ["A", "Select/deselect All visible rows"], ["h/l", "Use vim keys to move to prev/next page"], ["q", "Quit"]]
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
                    help_lines.map do |key, desc|
                      tui.text_line(spans: [tui.text_span(content: key, style: Views::HOTKEY_STYLE),
