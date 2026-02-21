@@ -81,20 +81,36 @@ module Sidekiq
       # --- View: renders table widget with configuration from parent ---
 
       View = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil|
-        highlight = tui.style(fg: :white, bg: :blue)
-        count_text = "Count: #{model.row_ids.size}"
-        count_text += " | Page: #{pager.current_page}" if pager
-        count_text += " | Filter: #{filter_state[:filter]}" if filter_state && filter_state[:filter]
+        # Footer adapts to paginated vs scrollable tables.
+        # Paginated (set tabs): Page, Count, Total, Selected, Filter
+        # Scrollable (Busy/Queues): Count, Selected
+        footer = [""]
+        if pager
+          footer.push("Page: #{pager.current_page}", "Count: #{model.row_ids.size}", "Total: #{pager.total}")
+        else
+          footer << "Count: #{model.row_ids.size}"
+        end
+        footer << "Selected: #{model.selected.size}" unless model.selected.empty?
+
+        if filter_state && filter_state[:filter]
+          spans = [
+            tui.text_span(content: "Filter: ", style: Views::FILTER_STYLE),
+            tui.text_span(content: filter_state[:filter], style: Views::FILTER_STYLE)
+          ]
+          spans << tui.text_span(content: "_", style: Views::BLINK_STYLE) if filter_state[:filtering]
+          footer << tui.text_line(spans: spans)
+        end
 
         tui.table(
           rows: rows,
-          header: tui.table_row(cells: header, style: tui.style(fg: :cyan, modifiers: [:bold])),
+          header: header,
           widths: widths,
           column_spacing: 1,
-          row_highlight_style: highlight,
+          row_highlight_style: tui.style(fg: :white, bg: :blue),
           highlight_symbol: "➡️",
           selected_row: model.selected_row_index,
-          block: tui.block(title: "#{title} (#{count_text})", borders: [:all])
+          footer: footer,
+          block: tui.block(title: title, borders: [:all])
         )
       }
     end
