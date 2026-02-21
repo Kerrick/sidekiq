@@ -54,7 +54,7 @@ module Sidekiq
       receive_routed :toggle_select_all, lambda { |_, model|
         return model if model.row_ids.empty?
 
-        new_selected = model.selected.size == model.row_ids.size ? [] : model.row_ids.dup
+        new_selected = model.selected.empty? ? model.row_ids.dup : []
         model.with(selected: new_selected)
       }
 
