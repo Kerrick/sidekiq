@@ -4,7 +4,13 @@ module Sidekiq
   module TUI
     module MetricsTab
       Controls = [].freeze
-      FetchCommand = ->(_model) { [FetchJobMetrics.new] }
+      FetchCommand = lambda { |model|
+        if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
+          [FetchJobMetrics.new]
+        else
+          []
+        end
+      }
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
       Model = Data.define(:datasets, :starts_at, :ends_at, :metrics_refresh_at)
