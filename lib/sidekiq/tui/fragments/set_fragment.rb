@@ -32,6 +32,7 @@ module Sidekiq
 
       ApplyData = ->(message, model) {
         data = message.event # the original ScheduledFetched / RetriesFetched / DeadFetched
+        DebugLogger.info("SetFragment ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
         new_table = model.table.with(row_ids: data.row_ids)
         new_pager = model.pager.with(
           current_page: data.current_page, total: data.total,
@@ -43,13 +44,25 @@ module Sidekiq
 
       # --- Filtering ---
 
-      StartFilter = ->(_, model) { model.with(filtering: true, filter: "") }
+      StartFilter = ->(_, model) {
+        DebugLogger.info("SetFragment StartFilter")
+        model.with(filtering: true, filter: "")
+      }
       IsFiltering = ->(_, model) { model.filtering }
       IsTextInput = ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 }
-      AppendChar = ->(message, model) { model.with(filter: "#{model.filter}#{message.code}") }
+      AppendChar = ->(message, model) {
+        DebugLogger.info("SetFragment AppendChar: #{message.code}")
+        model.with(filter: "#{model.filter}#{message.code}")
+      }
       Backspace = ->(_, model) { model.with(filter: (model.filter || "").chop) }
-      SubmitFilter = ->(_, model) { model.with(filtering: false) }
-      CancelFilter = ->(_, model) { model.with(filtering: false, filter: nil) }
+      SubmitFilter = ->(_, model) {
+        DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
+        model.with(filtering: false)
+      }
+      CancelFilter = ->(_, model) {
+        DebugLogger.info("SetFragment CancelFilter")
+        model.with(filtering: false, filter: nil)
+      }
 
       receive_routed :start_filter, StartFilter
 
@@ -64,6 +77,7 @@ module Sidekiq
 
       PrevPage = ->(_, model) {
         return model if model.pager.page < 2
+        DebugLogger.info("SetFragment PrevPage: page=#{model.pager.page - 1}")
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
@@ -74,6 +88,7 @@ module Sidekiq
 
       NextPage = ->(_, model) {
         return model unless model.pager.next_page
+        DebugLogger.info("SetFragment NextPage: page=#{model.pager.next_page}")
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(

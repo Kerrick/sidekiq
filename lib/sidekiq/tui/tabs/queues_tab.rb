@@ -26,6 +26,7 @@ module Sidekiq
       otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        DebugLogger.info("QueuesTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete_queue
           commands = message.ids.map { |qname| ClearQueue.new(queue_name: qname, tab: :queues) }

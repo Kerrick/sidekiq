@@ -29,6 +29,7 @@ module Sidekiq
       otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, ->(message, model) {
+        DebugLogger.info("BusyTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :terminate
           commands = message.ids.map { |id| SignalProcess.new(identity: id, signal: :terminate, tab: :busy) }
@@ -42,6 +43,7 @@ module Sidekiq
       }
 
       receive_instances_of ProcessesFetched, ->(message, model) {
+        DebugLogger.info("BusyTab ProcessesFetched: #{message.processes.size} processes")
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }

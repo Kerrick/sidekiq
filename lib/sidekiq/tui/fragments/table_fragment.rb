@@ -53,10 +53,16 @@ module Sidekiq
       # Anything the table doesn't handle as navigation gets wrapped
       # with the current selection and bubbled outward. The parent
       # intercepts ActionRequested and dispatches domain-specific commands.
-      receive_all ->(message, model) {
+      #
+      # Guard: skip our own ActionRequested — the outward flow shares the
+      # same receives registry, so receive_all would re-catch our bubbles.
+      NotOwnBubble = ->(message, _) { !message.is_a?(ActionRequested) }
+
+      receive NotOwnBubble, ->(message, model) {
         ids = model.action_ids
         return model if ids.empty?
         action = message.respond_to?(:envelope) ? message.envelope : message
+        DebugLogger.info("TableFragment receive_all: message=#{message.class} envelope=#{message.respond_to?(:envelope) ? message.envelope : 'N/A'} action=#{action}")
         cleared = model.with(selected: [], selected_row_index: 0)
         [cleared, Rooibos::Command.bubble(ActionRequested.new(envelope: :table, action:, ids:))]
       }
@@ -66,19 +72,19 @@ module Sidekiq
       # --- View: renders table widget with configuration from parent ---
 
       View = ->(model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil) {
-        highlight = tui.style(fg: :cyan, add_modifier: :bold)
+        highlight = tui.style(fg: :cyan, modifiers: [:bold])
         count_text = "Count: #{model.row_ids.size}"
         count_text += " | Page: #{pager.current_page}" if pager
         count_text += " | Filter: #{filter_state[:filter]}" if filter_state && filter_state[:filter]
 
         tui.table(
           rows: rows,
-          header: tui.table_row(cells: header, style: tui.style(fg: :cyan, add_modifier: :bold)),
+          header: tui.table_row(cells: header, style: tui.style(fg: :cyan, modifiers: [:bold])),
           widths: widths,
           column_spacing: 1,
           row_highlight_style: highlight,
           highlight_symbol: " ▶ ",
-          selected: model.selected_row_index,
+          selected_row: model.selected_row_index,
           block: tui.block(title: "#{title} (#{count_text})", borders: [:all])
         )
       }

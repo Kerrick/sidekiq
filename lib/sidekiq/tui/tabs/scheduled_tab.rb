@@ -35,6 +35,7 @@ module Sidekiq
 
       # Outward: intercept action bubbles from TableFragment
       HandleAction = ->(message, model) {
+        DebugLogger.info("ScheduledTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete  then [model, AlterSetRows.new(set_class_name: "Sidekiq::ScheduledSet", ids: message.ids, action_name: :delete, tab: :scheduled)]
         when :enqueue then [model, AlterSetRows.new(set_class_name: "Sidekiq::ScheduledSet", ids: message.ids, action_name: :add_to_queue, tab: :scheduled)]
@@ -46,6 +47,7 @@ module Sidekiq
 
       # Outward: intercept pagination bubbles from SetFragment
       HandleFetch = ->(message, model) {
+        DebugLogger.info("ScheduledTab HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model, FetchScheduledSet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }
       intercept_instances_of SetFragment::FetchRequested, HandleFetch

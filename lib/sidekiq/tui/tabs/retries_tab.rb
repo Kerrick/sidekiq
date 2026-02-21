@@ -33,6 +33,7 @@ module Sidekiq
       forward_instances_of RetriesFetched, to: :set, as: :data_received
 
       HandleAction = ->(message, model) {
+        DebugLogger.info("RetriesTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete then [model, AlterSetRows.new(set_class_name: "Sidekiq::RetrySet", ids: message.ids, action_name: :delete, tab: :retries)]
         when :retry  then [model, AlterSetRows.new(set_class_name: "Sidekiq::RetrySet", ids: message.ids, action_name: :retry, tab: :retries)]
@@ -43,6 +44,7 @@ module Sidekiq
       intercept_instances_of TableFragment::ActionRequested, HandleAction
 
       HandleFetch = ->(message, model) {
+        DebugLogger.info("RetriesTab HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model, FetchRetrySet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }
       intercept_instances_of SetFragment::FetchRequested, HandleFetch

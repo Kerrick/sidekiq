@@ -22,6 +22,7 @@ module Sidekiq
       include Sidekiq::Paginator
 
       def fetch_set(out, set_class, message_class)
+        DebugLogger.info("FetchSet: #{message_class} filter=#{filter} page=#{pager_page} size=#{pager_size}")
         set = set_class.new
         current_filter = filter
 

@@ -136,6 +136,7 @@ module Sidekiq
     }
 
     receive_instances_of ActionComplete, ->(_, model) {
+      DebugLogger.info("Root ActionComplete: re-fetching tab=#{model.active_tab}")
       [model, FetchCommandFor[model, model.active_tab]]
     }
 
@@ -148,9 +149,19 @@ module Sidekiq
 
     IsBusy      = ->(_, model) { model.active_tab == :busy }
     IsQueues    = ->(_, model) { model.active_tab == :queues }
-    IsScheduled = ->(_, model) { model.active_tab == :scheduled }
-    IsRetries   = ->(_, model) { model.active_tab == :retries }
-    IsDead      = ->(_, model) { model.active_tab == :dead }
+    IsScheduled = ->(_, model) { model.active_tab == :scheduled && !model.scheduled.set.filtering }
+    IsRetries   = ->(_, model) { model.active_tab == :retries && !model.retries.set.filtering }
+    IsDead      = ->(_, model) { model.active_tab == :dead && !model.dead.set.filtering }
+
+    # When a set tab is filtering, forward raw events to it so the
+    # filtering modal can capture keystrokes.
+    IsFilteringScheduled = ->(_, model) { model.active_tab == :scheduled && model.scheduled.set.filtering }
+    IsFilteringRetries   = ->(_, model) { model.active_tab == :retries && model.retries.set.filtering }
+    IsFilteringDead      = ->(_, model) { model.active_tab == :dead && model.dead.set.filtering }
+
+    otherwise route_to: :scheduled, when: IsFilteringScheduled
+    otherwise route_to: :retries, when: IsFilteringRetries
+    otherwise route_to: :dead, when: IsFilteringDead
 
     only when: IsBusy do
       route_to :busy do
