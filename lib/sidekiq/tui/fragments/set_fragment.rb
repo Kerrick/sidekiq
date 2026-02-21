@@ -58,11 +58,19 @@ module Sidekiq
         receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || "").chop) }
         receive_events :enter, ->(_, model) {
           DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
-          model.with(filtering: false)
+          new_model = model.with(filtering: false)
+          [new_model, Rooibos::Command.bubble(
+            FetchRequested.new(envelope: :set, filter: new_model.filter,
+                               pager_page: 1, pager_size: new_model.pager.size)
+          )]
         }
         receive_events :esc, ->(_, model) {
           DebugLogger.info("SetFragment CancelFilter")
-          model.with(filtering: false, filter: nil)
+          new_model = model.with(filtering: false, filter: nil)
+          [new_model, Rooibos::Command.bubble(
+            FetchRequested.new(envelope: :set, filter: nil,
+                               pager_page: 1, pager_size: new_model.pager.size)
+          )]
         }
       end
 
