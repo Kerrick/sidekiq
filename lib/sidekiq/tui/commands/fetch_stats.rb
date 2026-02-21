@@ -16,10 +16,15 @@ module Sidekiq
           enqueued: raw.enqueued, retries: raw.retry_size,
           scheduled: raw.scheduled_size, dead: raw.dead_size
         )
-        redis_url = Sidekiq.redis { |conn| conn.config.server_url } rescue "N/A"
+        redis_url = begin
+          Sidekiq.redis { |conn| conn.config.server_url }
+        rescue StandardError
+          'N/A'
+        end
         out.put(Ractor.make_shareable(StatsFetched.new(stats:, redis_url:)))
-      rescue => error
-        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
+      rescue StandardError => e
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: e.message,
+                                                         backtrace: e.backtrace&.first(10))))
       end
     end
   end

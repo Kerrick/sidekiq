@@ -3,14 +3,14 @@
 module Sidekiq
   module TUI
     module HomeTab
-      Controls = []
+      Controls = [].freeze
       FetchCommand = ->(_model) { [FetchRedisInfo.new] }
       Model = Data.define(
         :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info
       )
 
-      Init = -> {
+      Init = lambda {
         Ractor.make_shareable Model.new(
           chart_deltas_processed: Array.new(50, 0),
           chart_deltas_failed: Array.new(50, 0),
@@ -19,7 +19,7 @@ module Sidekiq
         )
       }
 
-      View = ->(model, tui, stats: EMPTY_STATS) {
+      View = lambda { |model, tui, stats: EMPTY_STATS|
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
@@ -27,7 +27,7 @@ module Sidekiq
         )
       }
 
-      Update = ->(message, model) {
+      Update = lambda { |message, model|
         case message
         in StatsFetched
           pd = message.stats.processed - model.previous_processed
@@ -45,15 +45,15 @@ module Sidekiq
         end
       }
 
-      RenderChart = ->(model, tui) {
+      RenderChart = lambda { |model, tui|
         y_max = [[model.chart_deltas_processed.max || 0, model.chart_deltas_failed.max || 0].max, 5].max
         proc_data = model.chart_deltas_processed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
         fail_data = model.chart_deltas_failed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
-        beacon = (Time.now.to_i % 2 == 0) ? "●" : " "
+        beacon = Time.now.to_i.even? ? '●' : ' '
         tui.chart(
           datasets: [
-            tui.dataset(name: "", data: proc_data, style: tui.style(fg: :green), marker: :dot, graph_type: :line),
-            tui.dataset(name: "", data: fail_data, style: tui.style(fg: :red), marker: :dot, graph_type: :line)
+            tui.dataset(name: '', data: proc_data, style: tui.style(fg: :green), marker: :dot, graph_type: :line),
+            tui.dataset(name: '', data: fail_data, style: tui.style(fg: :red), marker: :dot, graph_type: :line)
           ],
           x_axis: tui.axis(bounds: [0.0, 49.0], labels: [], style: tui.style(fg: :white)),
           y_axis: tui.axis(bounds: [0.0, y_max.to_f],
@@ -63,14 +63,14 @@ module Sidekiq
         )
       }
 
-      RenderRedis = ->(redis_info, tui) {
-        uptime = (redis_info.uptime_days == "N/A") ? "N/A" : "#{redis_info.uptime_days} days"
-        keys = ["Version", "Uptime", "Connected Clients", "Memory Usage", "Peak Memory"]
+      RenderRedis = lambda { |redis_info, tui|
+        uptime = redis_info.uptime_days == 'N/A' ? 'N/A' : "#{redis_info.uptime_days} days"
+        keys = ['Version', 'Uptime', 'Connected Clients', 'Memory Usage', 'Peak Memory']
         vals = [redis_info.version, uptime, redis_info.connected_clients,
                 redis_info.used_memory, redis_info.peak_memory]
         tui.paragraph(
-          text: [keys.map { |k| k.ljust(18) }.join("  "), vals.map { |v| v.to_s.ljust(18) }.join("  ")],
-          block: tui.block(title: "Redis Information", borders: [:all])
+          text: [keys.map { |k| k.ljust(18) }.join('  '), vals.map { |v| v.to_s.ljust(18) }.join('  ')],
+          block: tui.block(title: 'Redis Information', borders: [:all])
         )
       }
     end

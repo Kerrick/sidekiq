@@ -10,7 +10,9 @@ module Sidekiq
     class PagerState < Data.define(:page, :size, :current_page, :total, :next_page); end
 
     # Raw process data returned by Commands — formatting happens in the View.
-    class ProcessData < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader, :stopping); end
+    class ProcessData < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader,
+                                    :stopping)
+    end
 
     # Raw queue data returned by Commands.
     class QueueData < Data.define(:name, :size, :latency, :paused); end
@@ -25,8 +27,8 @@ module Sidekiq
       Stats.new(processed: 0, failed: 0, busy: 0, enqueued: 0, retries: 0, scheduled: 0, dead: 0)
     )
     EMPTY_REDIS_INFO = Ractor.make_shareable(
-      RedisInfo.new(version: "N/A", uptime_days: "N/A", connected_clients: "N/A",
-                    used_memory: "N/A", peak_memory: "N/A")
+      RedisInfo.new(version: 'N/A', uptime_days: 'N/A', connected_clients: 'N/A',
+                    used_memory: 'N/A', peak_memory: 'N/A')
     )
   end
 end

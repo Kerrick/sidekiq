@@ -9,7 +9,7 @@ module Sidekiq
         DebugLogger.info("AlterSetRows: set=#{set_class_name} action=#{action_name} ids=#{ids.inspect}")
         set = Object.const_get(set_class_name).new
         ids.each do |id|
-          score, jid = id.split("|")
+          score, jid = id.split('|')
           DebugLogger.info("AlterSetRows: fetching score=#{score} jid=#{jid}")
           item = set.fetch(score, jid)&.first
           DebugLogger.info("AlterSetRows: item=#{item.class} found=#{!item.nil?}")

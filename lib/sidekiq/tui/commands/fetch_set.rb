@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "sidekiq/paginator"
+require 'sidekiq/paginator'
 
 module Sidekiq
   module TUI
@@ -39,21 +39,22 @@ module Sidekiq
             [{ page: page_num, size: page_size }, item_rows, current_pg, total_count]
           end
 
-        rows = rows_data.map { |entry|
-          { id: [entry.score, entry["jid"]].join("|"),
+        rows = rows_data.map do |entry|
+          { id: [entry.score, entry['jid']].join('|'),
             at: entry.at.to_s, queue: entry.queue.to_s,
             display_class: entry.display_class.to_s, display_args: entry.display_args.to_s }
-        }
+        end
 
-        next_pg = (current * pager_data[:size] < total) ? pager_data[:page] + 1 : nil
+        next_pg = current * pager_data[:size] < total ? pager_data[:page] + 1 : nil
 
         out.put(Ractor.make_shareable(message_class.new(
-          rows:, row_ids: rows.map { |row| row[:id] },
-          current_page: current, total:, next_page: next_pg,
-          pager_page: pager_data[:page], pager_size: pager_data[:size]
-        )))
-      rescue => error
-        out.put(Ractor.make_shareable(DataFetchError.new(error_message: error.message, backtrace: error.backtrace&.first(10))))
+                                        rows:, row_ids: rows.map { |row| row[:id] },
+                                        current_page: current, total:, next_page: next_pg,
+                                        pager_page: pager_data[:page], pager_size: pager_data[:size]
+                                      )))
+      rescue StandardError => e
+        out.put(Ractor.make_shareable(DataFetchError.new(error_message: e.message,
+                                                         backtrace: e.backtrace&.first(10))))
       end
     end
 

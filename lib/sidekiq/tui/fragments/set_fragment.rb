@@ -16,7 +16,7 @@ module Sidekiq
 
       Model = Data.define(:table, :pager, :rows, :filter, :filtering, :tab_name)
 
-      Init = ->(tab_name:) {
+      Init = lambda { |tab_name:|
         Ractor.make_shareable Model.new(
           table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
           filter: nil, filtering: false, tab_name: tab_name
@@ -30,7 +30,7 @@ module Sidekiq
 
       # --- Data arrival (forwarded from parent with as: :data_received) ---
 
-      ApplyData = ->(message, model) {
+      ApplyData = lambda { |message, model|
         data = message.event # the original ScheduledFetched / RetriesFetched / DeadFetched
         DebugLogger.info("SetFragment ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
         new_table = model.table.with(row_ids: data.row_ids)
@@ -44,19 +44,19 @@ module Sidekiq
 
       # --- Filtering ---
 
-      receive_routed :start_filter, ->(_, model) {
-        DebugLogger.info("SetFragment StartFilter")
-        model.with(filtering: true, filter: "")
+      receive_routed :start_filter, lambda { |_, model|
+        DebugLogger.info('SetFragment StartFilter')
+        model.with(filtering: true, filter: '')
       }
 
       only when: ->(_, model) { model.filtering } do
         receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
-          ->(message, model) {
-            DebugLogger.info("SetFragment AppendChar: #{message.code}")
-            model.with(filter: "#{model.filter}#{message.code}")
-          }
-        receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || "").chop) }
-        receive_events :enter, ->(_, model) {
+                lambda { |message, model|
+                  DebugLogger.info("SetFragment AppendChar: #{message.code}")
+                  model.with(filter: "#{model.filter}#{message.code}")
+                }
+        receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || '').chop) }
+        receive_events :enter, lambda { |_, model|
           DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
           new_model = model.with(filtering: false)
           [new_model, Rooibos::Command.bubble(
@@ -64,8 +64,8 @@ module Sidekiq
                                pager_page: 1, pager_size: new_model.pager.size)
           )]
         }
-        receive_events :esc, ->(_, model) {
-          DebugLogger.info("SetFragment CancelFilter")
+        receive_events :esc, lambda { |_, model|
+          DebugLogger.info('SetFragment CancelFilter')
           new_model = model.with(filtering: false, filter: nil)
           [new_model, Rooibos::Command.bubble(
             FetchRequested.new(envelope: :set, filter: nil,
@@ -76,8 +76,9 @@ module Sidekiq
 
       # --- Pagination (bubbles FetchRequested for parent to intercept) ---
 
-      PrevPage = ->(_, model) {
+      PrevPage = lambda { |_, model|
         return model if model.pager.page < 2
+
         DebugLogger.info("SetFragment PrevPage: page=#{model.pager.page - 1}")
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
@@ -87,8 +88,9 @@ module Sidekiq
         )]
       }
 
-      NextPage = ->(_, model) {
+      NextPage = lambda { |_, model|
         return model unless model.pager.next_page
+
         DebugLogger.info("SetFragment NextPage: page=#{model.pager.next_page}")
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
@@ -105,20 +107,20 @@ module Sidekiq
 
       # --- View ---
 
-      View = ->(model, tui, stats: EMPTY_STATS) {
+      View = lambda { |model, tui, stats: EMPTY_STATS|
         filter_state = { filter: model.filter, filtering: model.filtering }
-        rows = model.rows.map.with_index { |entry, idx|
+        rows = model.rows.map.with_index do |entry, idx|
           tui.table_row(
-            cells: [model.table.selected?(entry[:id]) ? "✅" : "",
+            cells: [model.table.selected?(entry[:id]) ? '✅' : '',
                     entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
             style: idx.even? ? nil : Views::ALT_ROW_STYLE
           )
-        }
+        end
         table_widget = TableFragment::View[model.table, tui,
-          title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager, filter_state: filter_state,
-          header: ["☑️", "When", "Queue", "Job", "Arguments"],
-          widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
-                   tui.constraint_length(30), tui.constraint_fill(1)]]
+                                           title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager, filter_state: filter_state,
+                                           header: ['☑️', 'When', 'Queue', 'Job', 'Arguments'],
+                                           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
+                                                    tui.constraint_length(30), tui.constraint_fill(1)]]
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1)],

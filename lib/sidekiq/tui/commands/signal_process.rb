@@ -6,7 +6,7 @@ module Sidekiq
       include Rooibos::Command::Custom
 
       def call(out, _token)
-        process = Sidekiq::Process.new("identity" => identity)
+        process = Sidekiq::Process.new('identity' => identity)
         case signal
         when :quiet then process.quiet!
         when :terminate then process.stop!
