@@ -7,7 +7,7 @@ module Sidekiq
 
       Controls = [
         TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: 'D', description: 'Delete'),
-        TabControl.new(key: :p, semantic: :toggle_pause, display_key: 'p', description: 'Pause/Unpause')
+        TabControl.new(key: :p, semantic: :toggle_pause, display_key: 'p', description: 'Pause/Unpause Queue')
       ].freeze
       FetchCommand = ->(_model) { [FetchQueues.new] }
 

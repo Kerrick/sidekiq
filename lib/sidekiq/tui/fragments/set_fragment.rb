@@ -53,12 +53,13 @@ module Sidekiq
         receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
                 lambda { |message, model|
                   DebugLogger.info("SetFragment AppendChar: #{message.code}")
-                  model.with(filter: "#{model.filter}#{message.code}")
+                  model.with(filter: "#{model.filter}#{message.code}",
+                             table: model.table.with(selected: []))
                 }
         receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || '').chop) }
         receive_events :enter, lambda { |_, model|
           DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
-          new_model = model.with(filtering: false)
+          new_model = model.with(filtering: false, table: model.table.with(selected: []))
           [new_model, Rooibos::Command.bubble(
             FetchRequested.new(envelope: :set, filter: new_model.filter,
                                pager_page: 1, pager_size: new_model.pager.size)
@@ -66,7 +67,7 @@ module Sidekiq
         }
         receive_events :esc, lambda { |_, model|
           DebugLogger.info('SetFragment CancelFilter')
-          new_model = model.with(filtering: false, filter: nil)
+          new_model = model.with(filtering: false, filter: nil, table: model.table.with(selected: []))
           [new_model, Rooibos::Command.bubble(
             FetchRequested.new(envelope: :set, filter: nil,
                                pager_page: 1, pager_size: new_model.pager.size)

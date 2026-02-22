@@ -86,10 +86,15 @@ module Sidekiq
     end
 
     # --- Global keys ---
+    # When a set tab is filtering, single-char keys must reach the filtering
+    # modal rather than firing global actions. Upstream's pattern-match order
+    # captures ALL single-char keys during filtering before checking CONTROLS.
 
     action :quit, -> { Rooibos::Command.exit }
-    receive_events %i[q ctrl_c], :quit
-    receive_events :"?", ->(_, model) { model.with(showing: :help) }
+    only when: ->(_, model) { !IsSetFiltering[nil, model] } do
+      receive_events %i[q ctrl_c], :quit
+      receive_events :"?", ->(_, model) { model.with(showing: :help) }
+    end
 
     receive_events :left, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
@@ -117,7 +122,7 @@ module Sidekiq
     # --- Data fetch results ---
 
     observe_instances_of StatsFetched, lambda { |message, model|
-      model.with(stats: message.stats, redis_url: message.redis_url, error: nil)
+      model.with(stats: message.stats, redis_url: message.redis_url)
     }
 
     forward_instances_of StatsFetched, to: :home
@@ -225,7 +230,7 @@ module Sidekiq
       tab_module = TAB_MODULES[tab]
       common = [['?', 'Help'], ['←/→', 'Select Tab'], ['q', 'Quit']]
       tab_controls = tab_module::Controls
-      return common if tab_controls.empty?
+      return common if model.active_tab == :home
 
       tab_display = tab_controls.map { |control| [control.display_key, control.description] }
       common + SHARED_TABLE_DISPLAY + tab_display
