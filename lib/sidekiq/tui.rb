@@ -52,7 +52,7 @@ module Sidekiq
     Init = lambda {
       model = Ractor.make_shareable Model.new(
         active_tab: :home, showing: :main,
-        stats: EMPTY_STATS, stats_loading: true, redis_url: 'N/A', error: nil,
+        stats: Stats::Record::EMPTY, stats_loading: true, redis_url: 'N/A', error: nil,
         home: HomeTab::Init[],
         busy: BusyTab::Init[],
         queues: QueuesTab::Init[],
@@ -62,7 +62,7 @@ module Sidekiq
         metrics: MetricsTab::Init[]
       )
       [model,
-       Rooibos::Command.batch(FetchStats.new, FetchRedisInfo.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
+       Rooibos::Command.batch(Stats::Fetch.new, RedisInfo::Fetch.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
     }
 
     View = lambda { |model, tui|
@@ -122,12 +122,12 @@ module Sidekiq
 
     # --- Data fetch results ---
 
-    observe_instances_of StatsFetched, lambda { |message, model|
+    observe_instances_of Stats::Fetched, lambda { |message, model|
       model.with(stats: message.stats, stats_loading: false, redis_url: message.redis_url)
     }
 
-    forward_instances_of StatsFetched, to: :home
-    forward_instances_of RedisInfoFetched, to: :home
+    forward_instances_of Stats::Fetched, to: :home
+    forward_instances_of RedisInfo::Fetched, to: :home
     forward_instances_of Processes::Fetched, to: :busy
     forward_instances_of Queues::Fetched, to: :queues
     forward_instances_of ScheduledFetched, to: :scheduled
@@ -206,7 +206,7 @@ module Sidekiq
     FetchCommandFor = lambda { |model, tab|
       tab_model = model.public_send(tab)
       tab_module = TAB_MODULES[tab]
-      Rooibos::Command.batch(FetchStats.new, *tab_module::FetchCommand[tab_model])
+      Rooibos::Command.batch(Stats::Fetch.new, *tab_module::FetchCommand[tab_model])
     }
 
     ControlsForTab = lambda { |model|

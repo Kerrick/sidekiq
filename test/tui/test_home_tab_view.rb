@@ -23,7 +23,7 @@ class TestHomeTabView < Minitest::Test
   end
 
   def loaded_model
-    redis_info = Sidekiq::TUI::RedisInfo.new(
+    redis_info = Sidekiq::TUI::RedisInfo::Record.new(
       version: "7.2.4", uptime_days: "42",
       connected_clients: "12", used_memory: "4.2MB", peak_memory: "8.1MB"
     )

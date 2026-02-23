@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require_relative 'commands/fetch_stats'
-require_relative 'commands/fetch_redis_info'
+require_relative 'commands/stats'
+require_relative 'commands/redis_info'
 require_relative 'commands/processes'
 require_relative 'commands/queues'
 require_relative 'commands/fetch_set'

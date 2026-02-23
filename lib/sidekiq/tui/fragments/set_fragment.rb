@@ -19,7 +19,7 @@ module Sidekiq
 
       Init = lambda { |tab_name:|
         Ractor.make_shareable Model.new(
-          loading: true, table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
+          loading: true, table: TableFragment::Init[], pager: PagerState::EMPTY, rows: [],
           filter_model: FilterFragment::Init[], tab_name: tab_name
         )
       }

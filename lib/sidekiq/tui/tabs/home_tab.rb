@@ -4,7 +4,7 @@ module Sidekiq
   module TUI
     module HomeTab
       Controls = [].freeze
-      FetchCommand = ->(_model) { [FetchRedisInfo.new] }
+      FetchCommand = ->(_model) { [RedisInfo::Fetch.new] }
       Model = Data.define(
         :loading, :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info
@@ -16,7 +16,7 @@ module Sidekiq
           chart_deltas_processed: Array.new(50, 0),
           chart_deltas_failed: Array.new(50, 0),
           previous_processed: 0, previous_failed: 0,
-          redis_info: EMPTY_REDIS_INFO
+          redis_info: RedisInfo::Record::EMPTY
         )
       }
 
@@ -30,7 +30,7 @@ module Sidekiq
 
       Update = lambda { |message, model|
         case message
-        in StatsFetched
+        in Stats::Fetched
           pd = message.stats.processed - model.previous_processed
           fd = message.stats.failed - model.previous_failed
           model.with(
@@ -39,7 +39,7 @@ module Sidekiq
             previous_processed: message.stats.processed,
             previous_failed: message.stats.failed
           )
-        in RedisInfoFetched
+        in RedisInfo::Fetched
           model.with(loading: false, redis_info: message.redis_info)
         else
           model
