@@ -18,10 +18,10 @@ module Sidekiq
 
     # Shared sorted-set fragment, nested inside each set tab.
     # Handles pagination, table rendering, and selection.
-    # Filtering is delegated to FilterFragment.
+    # Filtering is delegated to Filter.
     # Parent tabs forward semantic data messages with `as: :data_received`
     # and intercept bubbles for domain-specific dispatch.
-    module SetFragment
+    module Set
       include Rooibos::Router
 
       # Bubbled when pagination changes — parent intercepts and issues tab-specific fetch.
@@ -33,20 +33,20 @@ module Sidekiq
 
       Init = lambda { |tab_name:|
         Ractor.make_shareable Model.new(
-          loading: true, table: TableFragment::Init[], pager: PagerState::EMPTY, rows: [],
-          filter_model: FilterFragment::Init[], tab_name: tab_name
+          loading: true, table: Table::Init[], pager: PagerState::EMPTY, rows: [],
+          filter_model: Filter::Init[], tab_name: tab_name
         )
       }
 
       # --- Nested fragments ---
 
-      route :table, to: TableFragment
-      route :filter_model, to: FilterFragment
+      route :table, to: Table
+      route :filter_model, to: Filter
 
-      # Forward start_filter to FilterFragment
+      # Forward start_filter to Filter
       forward_routed :start_filter, to: :filter_model, as: :start_filter
 
-      # When filtering is active, forward all unmatched events to FilterFragment
+      # When filtering is active, forward all unmatched events to Filter
       # so it can capture keystrokes.
       only when: ->(_, model) { model.filter_model.active } do
         otherwise route_to: :filter_model
@@ -59,7 +59,7 @@ module Sidekiq
 
       ApplyData = lambda { |message, model|
         data = message.event # the original ScheduledFetched / RetriesFetched / DeadFetched
-        DebugLogger.info("SetFragment ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
+        DebugLogger.info("Set ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
         new_table = model.table.with(row_ids: data.row_ids)
         new_pager = model.pager.with(
           current_page: data.current_page, total: data.total,
@@ -69,11 +69,11 @@ module Sidekiq
       }
       receive_routed :data_received, ApplyData
 
-      # --- FilterFragment intercepts ---
-      # When FilterFragment signals a filter change, clear selection, reset page, and re-fetch.
+      # --- Filter intercepts ---
+      # When Filter signals a filter change, clear selection, reset page, and re-fetch.
 
-      intercept_instances_of FilterFragment::FilterChanged, lambda { |message, model|
-        DebugLogger.info("SetFragment FilterChanged: text=#{message.text}")
+      intercept_instances_of Filter::FilterChanged, lambda { |message, model|
+        DebugLogger.info("Set FilterChanged: text=#{message.text}")
         new_table = model.table.with(selected: [])
         new_model = model.with(table: new_table)
         [new_model, Rooibos::Command.bubble(
@@ -87,7 +87,7 @@ module Sidekiq
       PrevPage = lambda { |_, model|
         return model unless model.pager.has_prev?
 
-        DebugLogger.info("SetFragment PrevPage: page=#{model.pager.page - 1}")
+        DebugLogger.info("Set PrevPage: page=#{model.pager.page - 1}")
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
@@ -99,7 +99,7 @@ module Sidekiq
       NextPage = lambda { |_, model|
         return model unless model.pager.has_next?
 
-        DebugLogger.info("SetFragment NextPage: page=#{model.pager.next_page}")
+        DebugLogger.info("Set NextPage: page=#{model.pager.next_page}")
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
@@ -124,7 +124,7 @@ module Sidekiq
             style: idx.even? ? nil : Styles::ALT_ROW
           )
         end
-        TableFragment::View[model.table, tui,
+        Table::View[model.table, tui,
                             title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
                             filter_state: filter_state, loading: model.loading,
                             header: ['☑️', 'When', 'Queue', 'Job', 'Arguments'],

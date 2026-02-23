@@ -14,12 +14,12 @@ module Sidekiq
 
       module ClassMethods
         def has_table
-          route :table, to: TableFragment
+          route :table, to: Table
           otherwise route_to: :table
         end
 
         def has_set
-          route :set, to: SetFragment
+          route :set, to: Set
           otherwise route_to: :set
         end
 

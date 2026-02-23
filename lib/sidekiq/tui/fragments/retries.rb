@@ -19,11 +19,11 @@ module Sidekiq
       Model = Data.define(:set)
 
       Init = lambda {
-        Ractor.make_shareable Model.new(set: SetFragment::Init[tab_name: :retries])
+        Ractor.make_shareable Model.new(set: Set::Init[tab_name: :retries])
       }
 
       View = lambda { |model, tui|
-        SetFragment::View[model.set, tui]
+        Set::View[model.set, tui]
       }
 
       forward_instances_of RetriesFetched, to: :set, as: :data_received
@@ -43,14 +43,14 @@ module Sidekiq
         else model
         end
       }
-      intercept_instances_of TableFragment::ActionRequested, HandleAction
+      intercept_instances_of Table::ActionRequested, HandleAction
 
       HandleFetch = lambda { |message, model|
         DebugLogger.info("Retries HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model,
          FetchRetrySet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }
-      intercept_instances_of SetFragment::FetchRequested, HandleFetch
+      intercept_instances_of Set::FetchRequested, HandleFetch
 
       Update = from_router
     end

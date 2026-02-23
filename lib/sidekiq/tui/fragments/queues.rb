@@ -11,7 +11,7 @@ module Sidekiq
       map :toggle_pause,  :p,       'Pause/Unpause Queue'
 
       Model = Data.define(:loading, :table, :queues, :pro)
-      Init = -> { Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], queues: [], pro: false) }
+      Init = -> { Ractor.make_shareable Model.new(loading: true, table: Table::Init[], queues: [], pro: false) }
 
       View = lambda { |model, tui|
         tui.layout(
@@ -21,7 +21,7 @@ module Sidekiq
         )
       }
 
-      intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
+      intercept_instances_of Table::ActionRequested, lambda { |message, model|
         DebugLogger.info("Queues HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete_queue
@@ -51,7 +51,7 @@ module Sidekiq
           tui.table_row(cells: cells, style: idx.even? ? nil : Styles::ALT_ROW)
         end
         widths = header.map.with_index { |_, i| tui.constraint_length(i == 1 ? 60 : 10) }
-        TableFragment::View[table, tui, title: 'Queues', header: header, widths: widths, rows: rows, loading: model.loading]
+        Table::View[table, tui, title: 'Queues', header: header, widths: widths, rows: rows, loading: model.loading]
       }
     end
   end

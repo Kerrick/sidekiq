@@ -19,17 +19,17 @@ module Sidekiq
       Model = Data.define(:set)
 
       Init = lambda {
-        Ractor.make_shareable Model.new(set: SetFragment::Init[tab_name: :scheduled])
+        Ractor.make_shareable Model.new(set: Set::Init[tab_name: :scheduled])
       }
 
       View = lambda { |model, tui|
-        SetFragment::View[model.set, tui]
+        Set::View[model.set, tui]
       }
 
-      # Inward: forward semantic data message to SetFragment
+      # Inward: forward semantic data message to Set
       forward_instances_of ScheduledFetched, to: :set, as: :data_received
 
-      # Outward: intercept action bubbles from TableFragment
+      # Outward: intercept action bubbles from Table
       HandleAction = lambda { |message, model|
         DebugLogger.info("Scheduled HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
@@ -45,15 +45,15 @@ module Sidekiq
         else model
         end
       }
-      intercept_instances_of TableFragment::ActionRequested, HandleAction
+      intercept_instances_of Table::ActionRequested, HandleAction
 
-      # Outward: intercept pagination bubbles from SetFragment
+      # Outward: intercept pagination bubbles from Set
       HandleFetch = lambda { |message, model|
         DebugLogger.info("Scheduled HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model,
          FetchScheduledSet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }
-      intercept_instances_of SetFragment::FetchRequested, HandleFetch
+      intercept_instances_of Set::FetchRequested, HandleFetch
 
       Update = from_router
     end

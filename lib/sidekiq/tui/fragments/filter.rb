@@ -3,12 +3,12 @@
 module Sidekiq
   module TUI
     # Pure state machine for filtering in set tabs.
-    # No View — filter display is part of TableFragment's footer.
+    # No View — filter display is part of Table's footer.
     # Bubbles FilterChanged on submit (enter) or cancel (esc).
-    module FilterFragment
+    module Filter
       include Rooibos::Router
 
-      # Bubbled when the filter changes — SetFragment intercepts to trigger a re-fetch.
+      # Bubbled when the filter changes — Set intercepts to trigger a re-fetch.
       class FilterChanged < Data.define(:envelope, :text)
         include Rooibos::Message::Predicates
       end
@@ -17,24 +17,24 @@ module Sidekiq
       Init = -> { Ractor.make_shareable Model.new(active: false, text: nil) }
 
       receive_routed :start_filter, lambda { |_, model|
-        DebugLogger.info('FilterFragment StartFilter')
+        DebugLogger.info('Filter StartFilter')
         model.with(active: true, text: '')
       }
 
       only when: ->(_, model) { model.active } do
         receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
                 lambda { |message, model|
-                  DebugLogger.info("FilterFragment AppendChar: #{message.code}")
+                  DebugLogger.info("Filter AppendChar: #{message.code}")
                   model.with(text: "#{model.text}#{message.code}")
                 }
         receive_events :backspace, ->(_, model) { model.with(text: (model.text || '').chop) }
         receive_events :enter, lambda { |_, model|
-          DebugLogger.info("FilterFragment SubmitFilter: text=#{model.text}")
+          DebugLogger.info("Filter SubmitFilter: text=#{model.text}")
           [model.with(active: false),
            Rooibos::Command.bubble(FilterChanged.new(envelope: :filter, text: model.text))]
         }
         receive_events :esc, lambda { |_, model|
-          DebugLogger.info('FilterFragment CancelFilter')
+          DebugLogger.info('Filter CancelFilter')
           [model.with(active: false, text: nil),
            Rooibos::Command.bubble(FilterChanged.new(envelope: :filter, text: nil))]
         }

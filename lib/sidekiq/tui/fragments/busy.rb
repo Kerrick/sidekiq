@@ -33,7 +33,7 @@ module Sidekiq
       end
 
       Init = lambda {
-        Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], processes: [], work_set_size: 0)
+        Ractor.make_shareable Model.new(loading: true, table: Table::Init[], processes: [], work_set_size: 0)
       }
 
       View = lambda { |model, tui|
@@ -44,7 +44,7 @@ module Sidekiq
         )
       }
 
-      intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
+      intercept_instances_of Table::ActionRequested, lambda { |message, model|
         DebugLogger.info("Busy HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :terminate
@@ -89,7 +89,7 @@ module Sidekiq
                    process.concurrency.to_s, process.busy.to_s]
           tui.table_row(cells: cells, style: idx.even? ? nil : Styles::ALT_ROW)
         end
-        TableFragment::View[table, tui, title: 'Processes',
+        Table::View[table, tui, title: 'Processes',
                                         header: ['☑️', 'Name', 'Started', 'RSS', 'Threads', 'Busy'],
                                         widths: [tui.constraint_length(5), tui.constraint_fill(1), tui.constraint_length(24),
                                                  tui.constraint_length(10), tui.constraint_length(6), tui.constraint_length(6)],
