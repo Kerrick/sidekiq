@@ -16,11 +16,13 @@ module Sidekiq
         def has_table
           route :table, to: Table
           otherwise route_to: :table
+          register_table_bindings
         end
 
         def has_set
           route :set, to: Set
           otherwise route_to: :set
+          register_table_bindings
         end
 
         def fetch_command(fetch_class)
@@ -33,6 +35,17 @@ module Sidekiq
         end
 
         def key_bindings = @key_bindings.freeze
+
+        private
+
+        def register_table_bindings
+          map :prev_page,         :h,       'Prev/Next Page'
+          map :next_page,         :l,       'Prev/Next Page'
+          map :row_up,            :k,       'Prev/Next Row'
+          map :row_down,          :j,       'Prev/Next Row'
+          map :toggle_select,     :x,       'Select'
+          map :toggle_select_all, :shift_A, 'Select All'
+        end
       end
     end
   end

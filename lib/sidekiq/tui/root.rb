@@ -144,16 +144,6 @@ module Sidekiq
       end
     }
 
-    # --- Semantic key→message forwarding to active tab ---
-
-    SHARED_TABLE_KEYS = { j: :row_down, k: :row_up, x: :toggle_select, shift_A: :toggle_select_all,
-                          h: :prev_page, l: :next_page }.freeze
-    TABLE_BINDINGS = [
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'h/l', description: 'Prev/Next Page'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'j/k', description: 'Prev/Next Row'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'x', description: 'Select'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'A', description: 'Select All')
-    ].freeze
 
     # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
@@ -174,7 +164,6 @@ module Sidekiq
       }
       only when: guard do
         route_to tab do
-          SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
           TAB_MODULES[tab].key_bindings.each { |c| forward_events c.key, as: c.semantic }
         end
       end
@@ -201,7 +190,7 @@ module Sidekiq
       tab_module = TAB_MODULES[tab]
       return COMMON_BINDINGS if model.active_tab == :home
 
-      COMMON_BINDINGS + TABLE_BINDINGS + tab_module.key_bindings
+      COMMON_BINDINGS + tab_module.key_bindings
     }
 
     RenderKeyBindings = lambda { |bindings, tui|
@@ -261,7 +250,7 @@ module Sidekiq
     }
 
     ESC_BINDING = KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close')
-    HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }, *TABLE_BINDINGS].freeze
+    HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }].freeze
 
     RenderHelp = lambda { |_, tui|
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
