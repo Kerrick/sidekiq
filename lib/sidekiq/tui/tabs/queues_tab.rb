@@ -9,7 +9,7 @@ module Sidekiq
         TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: 'D', description: 'Delete'),
         TabControl.new(key: :p, semantic: :toggle_pause, display_key: 'p', description: 'Pause/Unpause Queue')
       ].freeze
-      FetchCommand = ->(_model) { [FetchQueues.new] }
+      FetchCommand = ->(_model) { [Queues::Fetch.new] }
 
       Model = Data.define(:loading, :table, :queues, :pro)
       Init = -> { Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], queues: [], pro: false) }
@@ -37,7 +37,7 @@ module Sidekiq
         end
       }
 
-      receive_instances_of QueuesFetched, lambda { |message, model|
+      receive_instances_of Queues::Fetched, lambda { |message, model|
         new_table = model.table.with(row_ids: message.queues.map(&:name))
         model.with(loading: false, table: new_table, queues: message.queues, pro: message.pro || false)
       }

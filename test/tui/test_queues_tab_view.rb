@@ -24,9 +24,9 @@ class TestQueuesTabView < Minitest::Test
 
   def loaded_model
     queues = [
-      Sidekiq::TUI::QueueData.new(name: "default", size: 42, latency: 1.5, paused: false),
-      Sidekiq::TUI::QueueData.new(name: "critical", size: 7, latency: 0.02, paused: false),
-      Sidekiq::TUI::QueueData.new(name: "mailers", size: 0, latency: 0.0, paused: false)
+      Sidekiq::TUI::Queues::Record.new(name: "default", size: 42, latency: 1.5, paused: false),
+      Sidekiq::TUI::Queues::Record.new(name: "critical", size: 7, latency: 0.02, paused: false),
+      Sidekiq::TUI::Queues::Record.new(name: "mailers", size: 0, latency: 0.0, paused: false)
     ]
     init = Sidekiq::TUI::QueuesTab::Init[]
     init.with(

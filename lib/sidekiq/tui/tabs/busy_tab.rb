@@ -9,7 +9,7 @@ module Sidekiq
         TabControl.new(key: :shift_T, semantic: :terminate, display_key: 'T', description: 'Terminate'),
         TabControl.new(key: :shift_Q, semantic: :quiet, display_key: 'Q', description: 'Quiet')
       ].freeze
-      FetchCommand = ->(_model) { [FetchProcesses.new] }
+      FetchCommand = ->(_model) { [Processes::Fetch.new] }
 
       Model = Data.define(:loading, :table, :processes, :work_set_size)
 
@@ -40,7 +40,7 @@ module Sidekiq
         end
       }
 
-      receive_instances_of ProcessesFetched, lambda { |message, model|
+      receive_instances_of Processes::Fetched, lambda { |message, model|
         DebugLogger.info("BusyTab ProcessesFetched: #{message.processes.size} processes")
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)

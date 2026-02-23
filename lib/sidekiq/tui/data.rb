@@ -9,14 +9,6 @@ module Sidekiq
 
     class PagerState < Data.define(:page, :size, :current_page, :total, :next_page); end
 
-    # Raw process data returned by Commands — formatting happens in the View.
-    class ProcessData < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader,
-                                    :stopping)
-    end
-
-    # Raw queue data returned by Commands.
-    class QueueData < Data.define(:name, :size, :latency, :paused); end
-
     # Couples a key binding with its semantic name and display label.
     class TabControl < Data.define(:key, :semantic, :display_key, :description); end
 

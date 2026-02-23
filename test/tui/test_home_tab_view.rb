@@ -34,16 +34,20 @@ class TestHomeTabView < Minitest::Test
   public
 
   def test_skeleton_state_snapshot
-    with_test_terminal(120, 20) do
-      render_home(Sidekiq::TUI::HomeTab::Init[])
-      assert_snapshots("home_tab_skeleton")
+    Time.stub(:now, Time.at(100)) do
+      with_test_terminal(120, 20) do
+        render_home(Sidekiq::TUI::HomeTab::Init[])
+        assert_snapshots("home_tab_skeleton")
+      end
     end
   end
 
   def test_loaded_state_snapshot
-    with_test_terminal(120, 20) do
-      render_home(loaded_model)
-      assert_snapshots("home_tab_loaded")
+    Time.stub(:now, Time.at(101)) do
+      with_test_terminal(120, 20) do
+        render_home(loaded_model)
+        assert_snapshots("home_tab_loaded")
+      end
     end
   end
 end

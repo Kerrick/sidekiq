@@ -128,8 +128,8 @@ module Sidekiq
 
     forward_instances_of StatsFetched, to: :home
     forward_instances_of RedisInfoFetched, to: :home
-    forward_instances_of ProcessesFetched, to: :busy
-    forward_instances_of QueuesFetched, to: :queues
+    forward_instances_of Processes::Fetched, to: :busy
+    forward_instances_of Queues::Fetched, to: :queues
     forward_instances_of ScheduledFetched, to: :scheduled
     forward_instances_of RetriesFetched, to: :retries
     forward_instances_of DeadFetched, to: :dead
