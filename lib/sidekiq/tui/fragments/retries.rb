@@ -3,14 +3,13 @@
 module Sidekiq
   module TUI
     module Retries
-      include Rooibos::Router
+      include Tab
+      has_set
 
-      Controls = [
-        TabControl.new(key: :shift_D, semantic: :delete,       display_key: 'D', description: 'Delete'),
-        TabControl.new(key: :shift_R, semantic: :retry,        display_key: 'R', description: 'Retry'),
-        TabControl.new(key: :shift_K, semantic: :kill, display_key: 'K', description: 'Kill'),
-        TabControl.new(key: :"/",     semantic: :start_filter, display_key: '/', description: 'Filter')
-      ].freeze
+      map :delete,       :shift_D, 'Delete'
+      map :retry,        :shift_R, 'Retry'
+      map :kill,         :shift_K, 'Kill'
+      map :start_filter, "/",      'Filter'
 
       FetchCommand = lambda { |model|
         [FetchRetrySet.new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
@@ -26,9 +25,6 @@ module Sidekiq
       View = lambda { |model, tui|
         SetFragment::View[model.set, tui]
       }
-
-      route :set, to: SetFragment
-      otherwise route_to: :set
 
       forward_instances_of RetriesFetched, to: :set, as: :data_received
 

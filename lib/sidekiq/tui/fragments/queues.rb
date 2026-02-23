@@ -3,13 +3,12 @@
 module Sidekiq
   module TUI
     module Queues
-      include Rooibos::Router
+      include Tab
+      has_table
+      fetch_command Queues::Fetch
 
-      Controls = [
-        TabControl.new(key: :shift_D, semantic: :delete_queue, display_key: 'D', description: 'Delete'),
-        TabControl.new(key: :p, semantic: :toggle_pause, display_key: 'p', description: 'Pause/Unpause Queue')
-      ].freeze
-      FetchCommand = ->(_model) { [Queues::Fetch.new] }
+      map :delete_queue,  :shift_D, 'Delete'
+      map :toggle_pause,  :p,       'Pause/Unpause Queue'
 
       Model = Data.define(:loading, :table, :queues, :pro)
       Init = -> { Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], queues: [], pro: false) }
@@ -21,9 +20,6 @@ module Sidekiq
           children: [RenderQueues[model, tui]]
         )
       }
-
-      route :table, to: TableFragment
-      otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
         DebugLogger.info("Queues HandleAction: action=#{message.action} ids=#{message.ids.inspect}")

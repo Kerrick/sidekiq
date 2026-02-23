@@ -3,20 +3,22 @@
 module Sidekiq
   module TUI
     module Metrics
-      Controls = [].freeze
-      FetchCommand = lambda { |model|
-        if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
-          [FetchJobMetrics.new]
-        else
-          []
-        end
-      }
+      include Tab
+
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
       Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_refresh_at)
 
       Init = lambda {
         Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
+      }
+
+      FetchCommand = lambda { |model|
+        if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
+          [FetchJobMetrics.new]
+        else
+          []
+        end
       }
 
       View = lambda { |model, tui|

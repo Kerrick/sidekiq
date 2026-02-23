@@ -3,13 +3,12 @@
 module Sidekiq
   module TUI
     module Dead
-      include Rooibos::Router
+      include Tab
+      has_set
 
-      Controls = [
-        TabControl.new(key: :shift_D, semantic: :delete,       display_key: 'D', description: 'Delete'),
-        TabControl.new(key: :shift_E, semantic: :enqueue,      display_key: 'E', description: 'Enqueue'),
-        TabControl.new(key: :"/",     semantic: :start_filter, display_key: '/', description: 'Filter')
-      ].freeze
+      map :delete,       :shift_D, 'Delete'
+      map :enqueue,      :shift_E, 'Enqueue'
+      map :start_filter, "/",      'Filter'
 
       FetchCommand = lambda { |model|
         [FetchDeadSet.new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
@@ -25,9 +24,6 @@ module Sidekiq
       View = lambda { |model, tui|
         SetFragment::View[model.set, tui]
       }
-
-      route :set, to: SetFragment
-      otherwise route_to: :set
 
       forward_instances_of DeadFetched, to: :set, as: :data_received
 

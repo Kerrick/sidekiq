@@ -6,6 +6,13 @@ module Sidekiq
 
     REFRESH_INTERVAL = 2.0
 
+    TAB_ORDER = %i[home busy queues scheduled retries dead metrics].freeze
+    TAB_NAMES = {
+      home: 'Home', busy: 'Busy', queues: 'Queues', scheduled: 'Scheduled',
+      retries: 'Retries', dead: 'Dead', metrics: 'Metrics'
+    }.freeze
+    SET_TABS = %i[scheduled retries dead].freeze
+
     TAB_MODULES = {
       home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
       retries: Retries, dead: Dead, metrics: Metrics
@@ -138,8 +145,12 @@ module Sidekiq
 
     SHARED_TABLE_KEYS = { j: :row_down, k: :row_up, x: :toggle_select, shift_A: :toggle_select_all,
                           h: :prev_page, l: :next_page }.freeze
-    SHARED_TABLE_DISPLAY = [['h/l', 'Prev/Next Page'], ['j/k', 'Prev/Next Row'],
-                            ['x', 'Select'], ['A', 'Select All']].freeze
+    TABLE_BINDINGS = [
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'h/l', description: 'Prev/Next Page'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'j/k', description: 'Prev/Next Row'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'x', description: 'Select'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'A', description: 'Select All')
+    ].freeze
 
     # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
@@ -161,7 +172,7 @@ module Sidekiq
       only when: guard do
         route_to tab do
           SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-          TAB_MODULES[tab]::Controls.each { |c| forward_events c.key, as: c.semantic }
+          TAB_MODULES[tab].key_bindings.each { |c| forward_events c.key, as: c.semantic }
         end
       end
     end
@@ -176,15 +187,25 @@ module Sidekiq
       Rooibos::Command.batch(Stats::Fetch.new, *tab_module::FetchCommand[tab_model])
     }
 
+    COMMON_BINDINGS = [
+      KeyBinding.new(key: nil, semantic: nil, display_key: '?', description: 'Help'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Select Tab'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
+    ].freeze
+
     ControlsForTab = lambda { |model|
       tab = model.active_tab
       tab_module = TAB_MODULES[tab]
-      common = [['?', 'Help'], ['←/→', 'Select Tab'], ['q', 'Quit']]
-      tab_controls = tab_module::Controls
-      return common if model.active_tab == :home
+      return COMMON_BINDINGS if model.active_tab == :home
 
-      tab_display = tab_controls.map { |control| [control.display_key, control.description] }
-      common + SHARED_TABLE_DISPLAY + tab_display
+      COMMON_BINDINGS + TABLE_BINDINGS + tab_module.key_bindings
+    }
+
+    RenderKeyBindings = lambda { |bindings, tui|
+      bindings.flat_map do |binding|
+        [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
+         tui.text_span(content: ": #{binding.description}  ")]
+      end
     }
 
     RenderMain = lambda { |model, tui|
@@ -221,9 +242,7 @@ module Sidekiq
                   TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
                 end
 
-      spans = ControlsForTab[model].flat_map do |key, desc|
-        [tui.text_span(content: key, style: Styles::HOTKEY), tui.text_span(content: ": #{desc}  ")]
-      end
+      spans = RenderKeyBindings[ControlsForTab[model], tui]
       controls = tui.paragraph(
         text: [tui.text_line(spans: spans),
                tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
@@ -238,14 +257,21 @@ module Sidekiq
       )
     }
 
+    HELP_BINDINGS = [
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Move between tabs'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'j/k', description: 'Use vim keys to move to prev/next row'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'x', description: 'Select/deselect current row'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'A', description: 'Select/deselect All visible rows'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'h/l', description: 'Use vim keys to move to prev/next page'),
+      KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
+    ].freeze
+
     RenderHelp = lambda { |_, tui|
-      help_lines = [["Esc", "Close"], ["←/→", "Move between tabs"],
-                    ["j/k", "Use vim keys to move to prev/next row"], ["x", "Select/deselect current row"],
-                    ["A", "Select/deselect All visible rows"], ["h/l", "Use vim keys to move to prev/next page"], ["q", "Quit"]]
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
-                   help_lines.map do |key, desc|
-                     tui.text_line(spans: [tui.text_span(content: key, style: Styles::HOTKEY),
-                                           tui.text_span(content: ": #{desc}")])
+                   HELP_BINDINGS.map do |binding|
+                     tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
+                                           tui.text_span(content: ": #{binding.description}")])
                    end
       content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE,
                           children: [tui.paragraph(text: text_lines)])

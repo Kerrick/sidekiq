@@ -11,6 +11,10 @@ module Sidekiq
       )
     end
 
+    SET_CLASS_NAMES = {
+      scheduled: 'Sidekiq::ScheduledSet', retries: 'Sidekiq::RetrySet', dead: 'Sidekiq::DeadSet'
+    }.freeze
+
 
     # Shared sorted-set fragment, nested inside each set tab.
     # Handles pagination, table rendering, and selection.

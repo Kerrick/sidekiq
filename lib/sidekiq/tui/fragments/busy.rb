@@ -3,13 +3,12 @@
 module Sidekiq
   module TUI
     module Busy
-      include Rooibos::Router
+      include Tab
+      has_table
+      fetch_command Processes::Fetch
 
-      Controls = [
-        TabControl.new(key: :shift_T, semantic: :terminate, display_key: 'T', description: 'Terminate'),
-        TabControl.new(key: :shift_Q, semantic: :quiet, display_key: 'Q', description: 'Quiet')
-      ].freeze
-      FetchCommand = ->(_model) { [Processes::Fetch.new] }
+      map :terminate, :shift_T, 'Terminate'
+      map :quiet,     :shift_Q, 'Quiet'
 
       class Model < Data.define(:loading, :table, :processes, :work_set_size)
         def total_concurrency = processes.sum(&:concurrency)
@@ -44,9 +43,6 @@ module Sidekiq
           children: [RenderStatus[model, tui], RenderProcesses[model, tui]]
         )
       }
-
-      route :table, to: TableFragment
-      otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
         DebugLogger.info("Busy HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
@@ -86,8 +82,8 @@ module Sidekiq
         table = model.table
         rows = model.processes.map.with_index do |process, idx|
           display_name = process.name
-          display_name += ' ⭐️' if process.leader
-          display_name += ' 🛑' if process.stopping
+          display_name = "#{process.name} ⭐️" if process.leader
+          display_name = "#{process.name} 🛑" if process.stopping
           cells = [table.selected?(process.identity) ? '✅' : '',
                    display_name, process.started_at.to_s, process.formatted_rss,
                    process.concurrency.to_s, process.busy.to_s]

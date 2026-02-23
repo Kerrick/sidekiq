@@ -12,8 +12,14 @@ require 'sidekiq/paginator'
 require 'logger'
 Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
 
+module Sidekiq
+  module TUI
+    class KeyBinding < Data.define(:key, :semantic, :display_key, :description); end
+  end
+end
+
 require_relative 'tui/styles'
-require_relative 'tui/shared'
+require_relative 'tui/tab'
 require_relative 'tui/repos'
 require_relative 'tui/fragments/table_fragment'
 require_relative 'tui/fragments/home'

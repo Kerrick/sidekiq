@@ -3,8 +3,9 @@
 module Sidekiq
   module TUI
     module Home
-      Controls = [].freeze
-      FetchCommand = ->(_model) { [RedisInfo::Fetch.new] }
+      include Tab
+      fetch_command RedisInfo::Fetch
+
       Model = Data.define(
         :loading, :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info
