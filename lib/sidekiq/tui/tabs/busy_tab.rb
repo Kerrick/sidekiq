@@ -11,7 +11,14 @@ module Sidekiq
       ].freeze
       FetchCommand = ->(_model) { [Processes::Fetch.new] }
 
-      Model = Data.define(:loading, :table, :processes, :work_set_size)
+      class Model < Data.define(:loading, :table, :processes, :work_set_size)
+        def total_concurrency = processes.sum(&:concurrency)
+        def total_rss = processes.sum(&:rss_kb)
+
+        def utilization
+          total_concurrency.zero? ? 0.0 : (work_set_size.to_f / total_concurrency * 100).round(1)
+        end
+      end
 
       Init = lambda {
         Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], processes: [], work_set_size: 0)
@@ -53,15 +60,8 @@ module Sidekiq
         vals = if model.loading
                  Array.new(5, '…')
                else
-                 total_concurrency = model.processes.sum(&:concurrency)
-                 total_rss = model.processes.sum(&:rss_kb)
-                 utilization = if total_concurrency.zero?
-                                 '0%'
-                               else
-                                 "#{(model.work_set_size.to_f / total_concurrency * 100).round(1)}%"
-                               end
-                 [model.processes.size.to_s, total_concurrency.to_s, model.work_set_size.to_s,
-                  utilization, Views::FormatMemory[total_rss]]
+                 [model.processes.size, model.total_concurrency, model.work_set_size,
+                  "#{model.utilization}%", Views::FormatMemory[model.total_rss]]
                end
         tui.paragraph(
           text: [keys.map { |k| k.ljust(12) }.join('  '), vals.map { |v| v.to_s.ljust(12) }.join('  ')],
@@ -71,13 +71,13 @@ module Sidekiq
 
       RenderProcesses = lambda { |model, tui|
         table = model.table
-        rows = model.processes.map.with_index do |process_data, idx|
-          name = "#{process_data.hostname}:#{process_data.pid}"
-          name += ' ⭐️' if process_data.leader
-          name += ' 🛑' if process_data.stopping
-          cells = [table.selected?(process_data.identity) ? '✅' : '',
-                   name, process_data.started_at.to_s, Views::FormatMemory[process_data.rss_kb],
-                   process_data.concurrency.to_s, process_data.busy.to_s]
+        rows = model.processes.map.with_index do |process, idx|
+          display_name = process.name
+          display_name += ' ⭐️' if process.leader
+          display_name += ' 🛑' if process.stopping
+          cells = [table.selected?(process.identity) ? '✅' : '',
+                   display_name, process.started_at.to_s, Views::FormatMemory[process.rss_kb],
+                   process.concurrency.to_s, process.busy.to_s]
           tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         end
         TableFragment::View[table, tui, title: 'Processes',

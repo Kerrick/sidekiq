@@ -5,9 +5,14 @@ module Sidekiq
     # Value objects — domain data structures shared across the application.
 
     class Stats < Data.define(:processed, :failed, :busy, :enqueued, :retries, :scheduled, :dead); end
-    class RedisInfo < Data.define(:version, :uptime_days, :connected_clients, :used_memory, :peak_memory); end
+    class RedisInfo < Data.define(:version, :uptime_days, :connected_clients, :used_memory, :peak_memory)
+      def uptime_display = uptime_days == 'N/A' ? 'N/A' : "#{uptime_days} days"
+    end
 
-    class PagerState < Data.define(:page, :size, :current_page, :total, :next_page); end
+    class PagerState < Data.define(:page, :size, :current_page, :total, :next_page)
+      def has_prev? = page > 1
+      def has_next? = !next_page.nil?
+    end
 
     # Couples a key binding with its semantic name and display label.
     class TabControl < Data.define(:key, :semantic, :display_key, :description); end

@@ -71,7 +71,7 @@ module Sidekiq
       # --- Pagination (bubbles FetchRequested for parent to intercept) ---
 
       PrevPage = lambda { |_, model|
-        return model if model.pager.page < 2
+        return model unless model.pager.has_prev?
 
         DebugLogger.info("SetFragment PrevPage: page=#{model.pager.page - 1}")
         new_pager = model.pager.with(page: model.pager.page - 1)
@@ -83,7 +83,7 @@ module Sidekiq
       }
 
       NextPage = lambda { |_, model|
-        return model unless model.pager.next_page
+        return model unless model.pager.has_next?
 
         DebugLogger.info("SetFragment NextPage: page=#{model.pager.next_page}")
         new_pager = model.pager.with(page: model.pager.next_page)

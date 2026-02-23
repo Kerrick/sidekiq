@@ -69,8 +69,7 @@ module Sidekiq
         vals = if model.loading
                  Array.new(5, '…')
                else
-                 uptime = model.redis_info.uptime_days == 'N/A' ? 'N/A' : "#{model.redis_info.uptime_days} days"
-                 [model.redis_info.version, uptime, model.redis_info.connected_clients,
+                 [model.redis_info.version, model.redis_info.uptime_display, model.redis_info.connected_clients,
                   model.redis_info.used_memory, model.redis_info.peak_memory]
                end
         tui.paragraph(

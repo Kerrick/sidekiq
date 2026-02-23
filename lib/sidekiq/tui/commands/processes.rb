@@ -3,9 +3,11 @@
 module Sidekiq
   module TUI
     module Processes
-      # Immutable record of process data — formatting happens in the View.
+      # Immutable record of process data.
+      # Pure readonly methods for domain logic; display formatting stays in the View.
       class Record < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader,
                                  :stopping)
+        def name = "#{hostname}:#{pid}"
       end
 
       class Fetched < Data.define(:processes, :work_set_size)
