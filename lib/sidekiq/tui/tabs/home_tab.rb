@@ -6,12 +6,13 @@ module Sidekiq
       Controls = [].freeze
       FetchCommand = ->(_model) { [FetchRedisInfo.new] }
       Model = Data.define(
-        :chart_deltas_processed, :chart_deltas_failed,
+        :loading, :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info
       )
 
       Init = lambda {
         Ractor.make_shareable Model.new(
+          loading: true,
           chart_deltas_processed: Array.new(50, 0),
           chart_deltas_failed: Array.new(50, 0),
           previous_processed: 0, previous_failed: 0,
@@ -19,11 +20,11 @@ module Sidekiq
         )
       }
 
-      View = lambda { |model, tui, stats: EMPTY_STATS|
+      View = lambda { |model, tui|
         tui.layout(
           direction: :vertical,
-          constraints: [tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
-          children: [Views::RenderStats[stats, tui], RenderChart[model, tui], RenderRedis[model.redis_info, tui]]
+          constraints: [tui.constraint_fill(1), tui.constraint_length(4)],
+          children: [RenderChart[model, tui], RenderRedis[model, tui]]
         )
       }
 
@@ -39,7 +40,7 @@ module Sidekiq
             previous_failed: message.stats.failed
           )
         in RedisInfoFetched
-          model.with(redis_info: message.redis_info)
+          model.with(loading: false, redis_info: message.redis_info)
         else
           model
         end
@@ -63,11 +64,15 @@ module Sidekiq
         )
       }
 
-      RenderRedis = lambda { |redis_info, tui|
-        uptime = redis_info.uptime_days == 'N/A' ? 'N/A' : "#{redis_info.uptime_days} days"
+      RenderRedis = lambda { |model, tui|
         keys = ['Version', 'Uptime', 'Connected Clients', 'Memory Usage', 'Peak Memory']
-        vals = [redis_info.version, uptime, redis_info.connected_clients,
-                redis_info.used_memory, redis_info.peak_memory]
+        vals = if model.loading
+                 Array.new(5, '…')
+               else
+                 uptime = model.redis_info.uptime_days == 'N/A' ? 'N/A' : "#{model.redis_info.uptime_days} days"
+                 [model.redis_info.version, uptime, model.redis_info.connected_clients,
+                  model.redis_info.used_memory, model.redis_info.peak_memory]
+               end
         tui.paragraph(
           text: [keys.map { |k| k.ljust(18) }.join('  '), vals.map { |v| v.to_s.ljust(18) }.join('  ')],
           block: tui.block(title: 'Redis Information', borders: [:all])

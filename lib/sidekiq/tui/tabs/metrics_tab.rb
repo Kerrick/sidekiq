@@ -13,24 +13,24 @@ module Sidekiq
       }
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
-      Model = Data.define(:datasets, :starts_at, :ends_at, :metrics_refresh_at)
+      Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_refresh_at)
 
       Init = lambda {
-        Ractor.make_shareable Model.new(datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
+        Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
       }
 
-      View = lambda { |model, tui, stats: EMPTY_STATS|
+      View = lambda { |model, tui|
         tui.layout(
           direction: :vertical,
-          constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [Views::RenderStats[stats, tui], RenderChart[model, tui]]
+          constraints: [tui.constraint_fill(1)],
+          children: [RenderChart[model, tui]]
         )
       }
 
       Update = lambda { |message, model|
         case message
         in MetricsFetched
-          model.with(datasets: message.datasets, starts_at: message.starts_at,
+          model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
                      ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
         else
           model

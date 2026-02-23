@@ -25,10 +25,14 @@ module Sidekiq
         end
       }
 
-      RenderStats = lambda { |stats, tui|
+      RenderStats = lambda { |stats, tui, loading: false|
         keys = %w[Processed Failed Busy Enqueued Retries Scheduled Dead]
-        vals = [stats.processed, stats.failed, stats.busy, stats.enqueued,
-                stats.retries, stats.scheduled, stats.dead]
+        vals = if loading
+                 Array.new(7, '…')
+               else
+                 [stats.processed, stats.failed, stats.busy, stats.enqueued,
+                  stats.retries, stats.scheduled, stats.dead]
+               end
         tui.paragraph(
           text: [keys.map { |k| k.ljust(12) }.join('  '), vals.map { |v| v.to_s.ljust(12) }.join('  ')],
           block: tui.block(title: 'Statistics', borders: [:all])

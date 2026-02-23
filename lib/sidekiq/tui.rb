@@ -21,6 +21,7 @@ require_relative 'tui/fragments/table_fragment'
 require_relative 'tui/tabs/home_tab'
 require_relative 'tui/tabs/busy_tab'
 require_relative 'tui/tabs/queues_tab'
+require_relative 'tui/fragments/filter_fragment'
 require_relative 'tui/fragments/set_fragment'
 require_relative 'tui/tabs/scheduled_tab'
 require_relative 'tui/tabs/retries_tab'
@@ -44,14 +45,14 @@ module Sidekiq
     }.freeze
 
     Model = Data.define(
-      :active_tab, :showing, :stats, :redis_url, :error,
+      :active_tab, :showing, :stats, :stats_loading, :redis_url, :error,
       :home, :busy, :queues, :scheduled, :retries, :dead, :metrics
     )
 
     Init = lambda {
       model = Ractor.make_shareable Model.new(
         active_tab: :home, showing: :main,
-        stats: EMPTY_STATS, redis_url: 'N/A', error: nil,
+        stats: EMPTY_STATS, stats_loading: true, redis_url: 'N/A', error: nil,
         home: HomeTab::Init[],
         busy: BusyTab::Init[],
         queues: QueuesTab::Init[],
@@ -122,7 +123,7 @@ module Sidekiq
     # --- Data fetch results ---
 
     observe_instances_of StatsFetched, lambda { |message, model|
-      model.with(stats: message.stats, redis_url: message.redis_url)
+      model.with(stats: message.stats, stats_loading: false, redis_url: message.redis_url)
     }
 
     forward_instances_of StatsFetched, to: :home
@@ -138,6 +139,8 @@ module Sidekiq
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
       model.with(error: message)
     }
+
+    NO_REFRESH_ACTIONS = %i[terminate quiet toggle_pause].freeze
 
     receive_instances_of ActionComplete, lambda { |message, model|
       DebugLogger.info("Root ActionComplete: tab=#{message.tab} action=#{message.action} succeeded=#{message.succeeded_ids.size}")
@@ -157,7 +160,11 @@ module Sidekiq
                 else
                   model
                 end
-      [updated, FetchCommandFor[model, model.active_tab]]
+      if NO_REFRESH_ACTIONS.include?(message.action)
+        updated
+      else
+        [updated, FetchCommandFor[model, model.active_tab]]
+      end
     }
 
     # --- Semantic key→message forwarding to active tab ---
@@ -169,9 +176,8 @@ module Sidekiq
 
     # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
-    SET_TABS = %i[scheduled retries dead].freeze
     IsSetFiltering = lambda { |_, model|
-      SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filtering
+      SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filter_model.active
     }
 
     only when: IsSetFiltering do
@@ -180,38 +186,16 @@ module Sidekiq
       otherwise route_to: :dead,      when: ->(_, model) { model.active_tab == :dead }
     end
 
-    only when: ->(_, model) { model.active_tab == :busy } do
-      route_to :busy do
-        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        BusyTab::Controls.each { |control| forward_events control.key, as: control.semantic }
-      end
-    end
-
-    only when: ->(_, model) { model.active_tab == :queues } do
-      route_to :queues do
-        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        QueuesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
-      end
-    end
-
-    only when: ->(_, model) { model.active_tab == :scheduled && !model.scheduled.set.filtering } do
-      route_to :scheduled do
-        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        ScheduledTab::Controls.each { |control| forward_events control.key, as: control.semantic }
-      end
-    end
-
-    only when: ->(_, model) { model.active_tab == :retries && !model.retries.set.filtering } do
-      route_to :retries do
-        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        RetriesTab::Controls.each { |control| forward_events control.key, as: control.semantic }
-      end
-    end
-
-    only when: ->(_, model) { model.active_tab == :dead && !model.dead.set.filtering } do
-      route_to :dead do
-        SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
-        DeadTab::Controls.each { |control| forward_events control.key, as: control.semantic }
+    (TAB_ORDER - %i[home metrics]).each do |tab|
+      is_set_tab = SET_TABS.include?(tab)
+      guard = ->(_, model) {
+        model.active_tab == tab && !(is_set_tab && IsSetFiltering[nil, model])
+      }
+      only when: guard do
+        route_to tab do
+          SHARED_TABLE_KEYS.each { |key, semantic| forward_events key, as: semantic }
+          TAB_MODULES[tab]::Controls.each { |c| forward_events c.key, as: c.semantic }
+        end
       end
     end
 
@@ -244,10 +228,12 @@ module Sidekiq
         divider: ' | ', highlight_style: Views::HIGHLIGHT_STYLE
       )
 
+      stats = Views::RenderStats[model.stats, tui, loading: model.stats_loading]
+
       content = if model.error
                   Views::RenderError[model.error, tui]
                 else
-                  TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui, stats: model.stats]
+                  TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
                 end
 
       spans = ControlsForTab[model].flat_map do |key, desc|
@@ -262,8 +248,8 @@ module Sidekiq
 
       tui.layout(
         direction: :vertical,
-        constraints: [tui.constraint_length(3), tui.constraint_fill(1), tui.constraint_length(4)],
-        children: [tab_bar, content, controls]
+        constraints: [tui.constraint_length(3), tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
+        children: [tab_bar, stats, content, controls]
       )
     }
 

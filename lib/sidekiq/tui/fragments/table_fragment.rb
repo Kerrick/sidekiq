@@ -79,10 +79,51 @@ module Sidekiq
 
       # --- View: renders table widget with configuration from parent ---
 
-      View = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil|
-        # Footer adapts to paginated vs scrollable tables.
-        # Paginated (set tabs): Page, Count, Total, Selected, Filter
-        # Scrollable (Busy/Queues): Count, Selected
+      View = lambda { |model, tui, title:, header:, widths:, rows:, loading: false, pager: nil, filter_state: nil|
+        if loading
+          SkeletonView[tui, title:, header:, widths:, pager:, filter_state:]
+        else
+          LoadedView[model, tui, title:, header:, widths:, rows:, pager:, filter_state:]
+        end
+      }
+
+      # Skeleton view — renders placeholder … row and footer.
+      # Does NOT receive model — structurally impossible to access real data.
+      SkeletonView = lambda { |tui, title:, header:, widths:, pager: nil, filter_state: nil|
+        footer = [""]
+        if pager
+          footer.push("Page: #{pager.current_page}", "Count: …", "Total: …")
+        else
+          footer << "Count: …"
+        end
+
+        if filter_state && filter_state[:filter]
+          spans = [
+            tui.text_span(content: "Filter: ", style: Views::FILTER_STYLE),
+            tui.text_span(content: filter_state[:filter], style: Views::FILTER_STYLE)
+          ]
+          spans << tui.text_span(content: "_", style: Views::BLINK_STYLE) if filter_state[:filtering]
+          footer << tui.text_line(spans: spans)
+        end
+
+        placeholder_cells = [''] + Array.new(header.size - 1, '…')
+        rows = [tui.table_row(cells: placeholder_cells)]
+
+        tui.table(
+          rows: rows,
+          header: header,
+          widths: widths,
+          column_spacing: 1,
+          row_highlight_style: tui.style(fg: :white, bg: :blue),
+          highlight_symbol: "➡️",
+          highlight_spacing: :always,
+          footer: footer,
+          block: tui.block(title: title, borders: [:all])
+        )
+      }
+
+      # Loaded view — renders real data.
+      LoadedView = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil|
         footer = [""]
         if pager
           footer.push("Page: #{pager.current_page}", "Count: #{model.row_ids.size}", "Total: #{pager.total}")
@@ -107,6 +148,7 @@ module Sidekiq
           column_spacing: 1,
           row_highlight_style: tui.style(fg: :white, bg: :blue),
           highlight_symbol: "➡️",
+          highlight_spacing: :always,
           selected_row: model.selected_row_index,
           footer: footer,
           block: tui.block(title: title, borders: [:all])

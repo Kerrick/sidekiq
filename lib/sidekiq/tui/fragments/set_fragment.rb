@@ -3,7 +3,8 @@
 module Sidekiq
   module TUI
     # Shared sorted-set fragment, nested inside each set tab.
-    # Handles filtering, pagination, table rendering, and selection.
+    # Handles pagination, table rendering, and selection.
+    # Filtering is delegated to FilterFragment.
     # Parent tabs forward semantic data messages with `as: :data_received`
     # and intercept bubbles for domain-specific dispatch.
     module SetFragment
@@ -14,18 +15,30 @@ module Sidekiq
         include Rooibos::Message::Predicates
       end
 
-      Model = Data.define(:table, :pager, :rows, :filter, :filtering, :tab_name)
+      Model = Data.define(:loading, :table, :pager, :rows, :filter_model, :tab_name)
 
       Init = lambda { |tab_name:|
         Ractor.make_shareable Model.new(
-          table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
-          filter: nil, filtering: false, tab_name: tab_name
+          loading: true, table: TableFragment::Init[], pager: EMPTY_PAGER, rows: [],
+          filter_model: FilterFragment::Init[], tab_name: tab_name
         )
       }
 
-      # --- Nested table ---
+      # --- Nested fragments ---
 
       route :table, to: TableFragment
+      route :filter_model, to: FilterFragment
+
+      # Forward start_filter to FilterFragment
+      forward_routed :start_filter, to: :filter_model, as: :start_filter
+
+      # When filtering is active, forward all unmatched events to FilterFragment
+      # so it can capture keystrokes.
+      only when: ->(_, model) { model.filter_model.active } do
+        otherwise route_to: :filter_model
+      end
+
+      # When not filtering, unmatched events go to the table for navigation/selection.
       otherwise route_to: :table
 
       # --- Data arrival (forwarded from parent with as: :data_received) ---
@@ -38,42 +51,22 @@ module Sidekiq
           current_page: data.current_page, total: data.total,
           next_page: data.next_page, page: data.pager_page, size: data.pager_size
         )
-        model.with(table: new_table, pager: new_pager, rows: data.rows)
+        model.with(loading: false, table: new_table, pager: new_pager, rows: data.rows)
       }
       receive_routed :data_received, ApplyData
 
-      # --- Filtering ---
+      # --- FilterFragment intercepts ---
+      # When FilterFragment signals a filter change, clear selection, reset page, and re-fetch.
 
-      receive_routed :start_filter, lambda { |_, model|
-        DebugLogger.info('SetFragment StartFilter')
-        model.with(filtering: true, filter: '')
+      intercept_instances_of FilterFragment::FilterChanged, lambda { |message, model|
+        DebugLogger.info("SetFragment FilterChanged: text=#{message.text}")
+        new_table = model.table.with(selected: [])
+        new_model = model.with(table: new_table)
+        [new_model, Rooibos::Command.bubble(
+          FetchRequested.new(envelope: :set, filter: message.text,
+                             pager_page: 1, pager_size: new_model.pager.size)
+        )]
       }
-
-      only when: ->(_, model) { model.filtering } do
-        receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
-                lambda { |message, model|
-                  DebugLogger.info("SetFragment AppendChar: #{message.code}")
-                  model.with(filter: "#{model.filter}#{message.code}",
-                             table: model.table.with(selected: []))
-                }
-        receive_events :backspace, ->(_, model) { model.with(filter: (model.filter || '').chop) }
-        receive_events :enter, lambda { |_, model|
-          DebugLogger.info("SetFragment SubmitFilter: filter=#{model.filter}")
-          new_model = model.with(filtering: false, table: model.table.with(selected: []))
-          [new_model, Rooibos::Command.bubble(
-            FetchRequested.new(envelope: :set, filter: new_model.filter,
-                               pager_page: 1, pager_size: new_model.pager.size)
-          )]
-        }
-        receive_events :esc, lambda { |_, model|
-          DebugLogger.info('SetFragment CancelFilter')
-          new_model = model.with(filtering: false, filter: nil, table: model.table.with(selected: []))
-          [new_model, Rooibos::Command.bubble(
-            FetchRequested.new(envelope: :set, filter: nil,
-                               pager_page: 1, pager_size: new_model.pager.size)
-          )]
-        }
-      end
 
       # --- Pagination (bubbles FetchRequested for parent to intercept) ---
 
@@ -84,7 +77,7 @@ module Sidekiq
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
-          FetchRequested.new(envelope: :set, filter: new_model.filter,
+          FetchRequested.new(envelope: :set, filter: model.filter_model.text,
                              pager_page: new_model.pager.page, pager_size: new_model.pager.size)
         )]
       }
@@ -96,7 +89,7 @@ module Sidekiq
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
-          FetchRequested.new(envelope: :set, filter: new_model.filter,
+          FetchRequested.new(envelope: :set, filter: model.filter_model.text,
                              pager_page: new_model.pager.page, pager_size: new_model.pager.size)
         )]
       }
@@ -108,8 +101,8 @@ module Sidekiq
 
       # --- View ---
 
-      View = lambda { |model, tui, stats: EMPTY_STATS|
-        filter_state = { filter: model.filter, filtering: model.filtering }
+      View = lambda { |model, tui|
+        filter_state = { filter: model.filter_model.text, filtering: model.filter_model.active }
         rows = model.rows.map.with_index do |entry, idx|
           tui.table_row(
             cells: [model.table.selected?(entry[:id]) ? '✅' : '',
@@ -117,16 +110,12 @@ module Sidekiq
             style: idx.even? ? nil : Views::ALT_ROW_STYLE
           )
         end
-        table_widget = TableFragment::View[model.table, tui,
-                                           title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager, filter_state: filter_state,
-                                           header: ['☑️', 'When', 'Queue', 'Job', 'Arguments'],
-                                           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
-                                                    tui.constraint_length(30), tui.constraint_fill(1)]]
-        tui.layout(
-          direction: :vertical,
-          constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [Views::RenderStats[stats, tui], table_widget]
-        )
+        TableFragment::View[model.table, tui,
+                            title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
+                            filter_state: filter_state, loading: model.loading,
+                            header: ['☑️', 'When', 'Queue', 'Job', 'Arguments'],
+                            widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
+                                     tui.constraint_length(30), tui.constraint_fill(1)]]
       }
     end
   end

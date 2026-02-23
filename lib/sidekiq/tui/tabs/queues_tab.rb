@@ -11,14 +11,14 @@ module Sidekiq
       ].freeze
       FetchCommand = ->(_model) { [FetchQueues.new] }
 
-      Model = Data.define(:table, :queues, :pro)
-      Init = -> { Ractor.make_shareable Model.new(table: TableFragment::Init[], queues: [], pro: false) }
+      Model = Data.define(:loading, :table, :queues, :pro)
+      Init = -> { Ractor.make_shareable Model.new(loading: true, table: TableFragment::Init[], queues: [], pro: false) }
 
-      View = lambda { |model, tui, stats: EMPTY_STATS|
+      View = lambda { |model, tui|
         tui.layout(
           direction: :vertical,
-          constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [Views::RenderStats[stats, tui], RenderQueues[model, tui]]
+          constraints: [tui.constraint_fill(1)],
+          children: [RenderQueues[model, tui]]
         )
       }
 
@@ -39,7 +39,7 @@ module Sidekiq
 
       receive_instances_of QueuesFetched, lambda { |message, model|
         new_table = model.table.with(row_ids: message.queues.map(&:name))
-        model.with(table: new_table, queues: message.queues, pro: message.pro || false)
+        model.with(loading: false, table: new_table, queues: message.queues, pro: message.pro || false)
       }
 
       Update = from_router
@@ -55,7 +55,7 @@ module Sidekiq
           tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
         end
         widths = header.map.with_index { |_, i| tui.constraint_length(i == 1 ? 60 : 10) }
-        TableFragment::View[table, tui, title: 'Queues', header: header, widths: widths, rows: rows]
+        TableFragment::View[table, tui, title: 'Queues', header: header, widths: widths, rows: rows, loading: model.loading]
       }
     end
   end

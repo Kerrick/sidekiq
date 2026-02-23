@@ -12,7 +12,7 @@ module Sidekiq
       ].freeze
 
       FetchCommand = lambda { |model|
-        [FetchDeadSet.new(filter: model.set.filter, pager_page: model.set.pager.page,
+        [FetchDeadSet.new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
                           pager_size: model.set.pager.size)]
       }
 
@@ -22,8 +22,8 @@ module Sidekiq
         Ractor.make_shareable Model.new(set: SetFragment::Init[tab_name: :dead])
       }
 
-      View = lambda { |model, tui, stats: EMPTY_STATS|
-        SetFragment::View[model.set, tui, stats:]
+      View = lambda { |model, tui|
+        SetFragment::View[model.set, tui]
       }
 
       route :set, to: SetFragment
