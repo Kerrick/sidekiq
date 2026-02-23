@@ -52,7 +52,7 @@ module Sidekiq
           cells = [table.selected?(queue_data.name) ? '✅' : '',
                    queue_data.name, queue_data.size.to_s, queue_data.latency.to_s]
           cells << (queue_data.paused ? '✅' : '') if model.pro
-          tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
+          tui.table_row(cells: cells, style: idx.even? ? nil : Styles::ALT_ROW)
         end
         widths = header.map.with_index { |_, i| tui.constraint_length(i == 1 ? 60 : 10) }
         TableFragment::View[table, tui, title: 'Queues', header: header, widths: widths, rows: rows, loading: model.loading]

@@ -191,20 +191,38 @@ module Sidekiq
       tab_bar = tui.tabs(
         titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
         selected_index: TAB_ORDER.index(model.active_tab),
-        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Views::TITLE_STYLE),
-        divider: ' | ', highlight_style: Views::HIGHLIGHT_STYLE
+        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
+        divider: ' | ', highlight_style: Styles::HIGHLIGHT
       )
 
-      stats = Views::RenderStats[model.stats, tui, loading: model.stats_loading]
+      stats_keys = %w[Processed Failed Busy Enqueued Retries Scheduled Dead]
+      stats_vals = if model.stats_loading
+                     Array.new(7, '…')
+                   else
+                     [model.stats.processed, model.stats.failed, model.stats.busy, model.stats.enqueued,
+                      model.stats.retries, model.stats.scheduled, model.stats.dead]
+                   end
+      stats = tui.paragraph(
+        text: [stats_keys.map { |k| k.ljust(12) }.join('  '), stats_vals.map { |v| v.to_s.ljust(12) }.join('  ')],
+        block: tui.block(title: 'Statistics', borders: [:all])
+      )
 
       content = if model.error
-                  Views::RenderError[model.error, tui]
+                  error_msg = model.error.respond_to?(:error_message) ? model.error.error_message : model.error.to_s
+                  error_bt = model.error.respond_to?(:backtrace) ? Array(model.error.backtrace) : []
+                  header = [tui.text_line(
+                    spans: [tui.text_span(content: error_msg, style: RatatuiRuby::Style::Style.new(modifiers: [:bold]))],
+                    alignment: :center
+                  )]
+                  lines = error_bt.map { |line| tui.text_line(spans: [tui.text_span(content: line)]) }
+                  tui.paragraph(text: header + lines, alignment: :left,
+                                block: tui.block(title: 'Error', borders: [:all], border_style: Styles::ERR_BORDER))
                 else
                   TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
                 end
 
       spans = ControlsForTab[model].flat_map do |key, desc|
-        [tui.text_span(content: key, style: Views::HOTKEY_STYLE), tui.text_span(content: ": #{desc}  ")]
+        [tui.text_span(content: key, style: Styles::HOTKEY), tui.text_span(content: ": #{desc}  ")]
       end
       controls = tui.paragraph(
         text: [tui.text_line(spans: spans),
@@ -226,13 +244,13 @@ module Sidekiq
                     ["A", "Select/deselect All visible rows"], ["h/l", "Use vim keys to move to prev/next page"], ["q", "Quit"]]
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
                    help_lines.map do |key, desc|
-                     tui.text_line(spans: [tui.text_span(content: key, style: Views::HOTKEY_STYLE),
+                     tui.text_line(spans: [tui.text_span(content: key, style: Styles::HOTKEY),
                                            tui.text_span(content: ": #{desc}")])
                    end
-      content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Views::TITLE_STYLE,
+      content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE,
                           children: [tui.paragraph(text: text_lines)])
       ctrl = tui.paragraph(
-        text: [tui.text_line(spans: [tui.text_span(content: 'Esc', style: Views::HOTKEY_STYLE),
+        text: [tui.text_line(spans: [tui.text_span(content: 'Esc', style: Styles::HOTKEY),
                                      tui.text_span(content: ': Close  ')])],
         block: tui.block(title: 'Controls', borders: [:all])
       )

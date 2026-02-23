@@ -99,10 +99,10 @@ module Sidekiq
 
         if filter_state && filter_state[:filter]
           spans = [
-            tui.text_span(content: "Filter: ", style: Views::FILTER_STYLE),
-            tui.text_span(content: filter_state[:filter], style: Views::FILTER_STYLE)
+            tui.text_span(content: "Filter: ", style: Styles::FILTER),
+            tui.text_span(content: filter_state[:filter], style: Styles::FILTER)
           ]
-          spans << tui.text_span(content: "_", style: Views::BLINK_STYLE) if filter_state[:filtering]
+          spans << tui.text_span(content: "_", style: Styles::BLINK) if filter_state[:filtering]
           footer << tui.text_line(spans: spans)
         end
 
@@ -134,10 +134,10 @@ module Sidekiq
 
         if filter_state && filter_state[:filter]
           spans = [
-            tui.text_span(content: "Filter: ", style: Views::FILTER_STYLE),
-            tui.text_span(content: filter_state[:filter], style: Views::FILTER_STYLE)
+            tui.text_span(content: "Filter: ", style: Styles::FILTER),
+            tui.text_span(content: filter_state[:filter], style: Styles::FILTER)
           ]
-          spans << tui.text_span(content: "_", style: Views::BLINK_STYLE) if filter_state[:filtering]
+          spans << tui.text_span(content: "_", style: Styles::BLINK) if filter_state[:filtering]
           footer << tui.text_line(spans: spans)
         end
 

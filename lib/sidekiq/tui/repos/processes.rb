@@ -8,6 +8,18 @@ module Sidekiq
       class Record < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader,
                                  :stopping)
         def name = "#{hostname}:#{pid}"
+
+        def formatted_rss
+          return '0' if rss_kb.nil? || rss_kb.zero?
+
+          if rss_kb < 100_000
+            "#{rss_kb} KB"
+          elsif rss_kb < 10_000_000
+            "#{(rss_kb / 1024.0).to_i} MB"
+          else
+            "#{(rss_kb / (1024.0 * 1024.0)).round(1)} GB"
+          end
+        end
       end
 
       class Fetched < Data.define(:processes, :work_set_size)

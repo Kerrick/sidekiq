@@ -18,6 +18,19 @@ module Sidekiq
         def utilization
           total_concurrency.zero? ? 0.0 : (work_set_size.to_f / total_concurrency * 100).round(1)
         end
+
+        def formatted_total_rss
+          rss_kb = total_rss
+          return '0' if rss_kb.zero?
+
+          if rss_kb < 100_000
+            "#{rss_kb} KB"
+          elsif rss_kb < 10_000_000
+            "#{(rss_kb / 1024.0).to_i} MB"
+          else
+            "#{(rss_kb / (1024.0 * 1024.0)).round(1)} GB"
+          end
+        end
       end
 
       Init = lambda {
@@ -61,7 +74,7 @@ module Sidekiq
                  Array.new(5, '…')
                else
                  [model.processes.size, model.total_concurrency, model.work_set_size,
-                  "#{model.utilization}%", Views::FormatMemory[model.total_rss]]
+                  "#{model.utilization}%", model.formatted_total_rss]
                end
         tui.paragraph(
           text: [keys.map { |k| k.ljust(12) }.join('  '), vals.map { |v| v.to_s.ljust(12) }.join('  ')],
@@ -76,9 +89,9 @@ module Sidekiq
           display_name += ' ⭐️' if process.leader
           display_name += ' 🛑' if process.stopping
           cells = [table.selected?(process.identity) ? '✅' : '',
-                   display_name, process.started_at.to_s, Views::FormatMemory[process.rss_kb],
+                   display_name, process.started_at.to_s, process.formatted_rss,
                    process.concurrency.to_s, process.busy.to_s]
-          tui.table_row(cells: cells, style: idx.even? ? nil : Views::ALT_ROW_STYLE)
+          tui.table_row(cells: cells, style: idx.even? ? nil : Styles::ALT_ROW)
         end
         TableFragment::View[table, tui, title: 'Processes',
                                         header: ['☑️', 'Name', 'Started', 'RSS', 'Threads', 'Busy'],

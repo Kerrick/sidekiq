@@ -12,10 +12,8 @@ require 'sidekiq/paginator'
 require 'logger'
 Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
 
-require_relative 'tui/tabs'
-require_relative 'tui/data'
-require_relative 'tui/views'
-require_relative 'tui/messages'
+require_relative 'tui/styles'
+require_relative 'tui/shared'
 require_relative 'tui/repos'
 require_relative 'tui/fragments/table_fragment'
 require_relative 'tui/fragments/home'
