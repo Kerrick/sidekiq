@@ -55,7 +55,7 @@ class TestScheduledView < Minitest::Test
 
   def test_init_state_snapshot
     with_test_terminal(120, 30) do
-      render_scheduled(Sidekiq::TUI::Scheduled::Init[])
+      render_scheduled(Sidekiq::TUI::Scheduled::Init[].first)
       assert_snapshots("scheduled_tab_init", &method(:normalize_timestamp))
     end
   end
@@ -76,7 +76,7 @@ class TestScheduledView < Minitest::Test
     loaded_lines = nil
 
     with_test_terminal(120, 30) do
-      init_lines = render_scheduled(Sidekiq::TUI::Scheduled::Init[])
+      init_lines = render_scheduled(Sidekiq::TUI::Scheduled::Init[].first)
     end
 
     with_test_terminal(120, 30) do

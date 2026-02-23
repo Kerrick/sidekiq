@@ -10,7 +10,8 @@ module Sidekiq
       Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_refresh_at)
 
       Init = lambda {
-        Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
+        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
+        [model, FetchJobMetrics.new]
       }
 
       FetchCommand = lambda { |model|

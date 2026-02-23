@@ -35,7 +35,7 @@ class TestBusyView < Minitest::Test
         concurrency: 5, busy: 2, leader: false, stopping: false
       )
     ]
-    init = Sidekiq::TUI::Busy::Init[]
+    init = Sidekiq::TUI::Busy::Init[].first
     init.with(
       loading: false,
       table: init.table.with(row_ids: processes.map(&:identity)),
@@ -47,7 +47,7 @@ class TestBusyView < Minitest::Test
 
   def test_skeleton_state_snapshot
     with_test_terminal(120, 20) do
-      render_busy(Sidekiq::TUI::Busy::Init[])
+      render_busy(Sidekiq::TUI::Busy::Init[].first)
       assert_snapshots("busy_tab_skeleton")
     end
   end

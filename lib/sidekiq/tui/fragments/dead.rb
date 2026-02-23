@@ -18,7 +18,8 @@ module Sidekiq
       Model = Data.define(:set)
 
       Init = lambda {
-        Ractor.make_shareable Model.new(set: Set::Init[tab_name: :dead])
+        model = Ractor.make_shareable Model.new(set: Set::Init[tab_name: :dead])
+        [model, FetchDeadSet.new(filter: '', pager_page: 1, pager_size: 25)]
       }
 
       View = lambda { |model, tui|

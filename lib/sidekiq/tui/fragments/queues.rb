@@ -11,7 +11,10 @@ module Sidekiq
       map :toggle_pause,  :p,       'Pause/Unpause Queue'
 
       Model = Data.define(:loading, :table, :queues, :pro)
-      Init = -> { Ractor.make_shareable Model.new(loading: true, table: Table::Init[], queues: [], pro: false) }
+      Init = lambda {
+        model = Ractor.make_shareable Model.new(loading: true, table: Table::Init[], queues: [], pro: false)
+        [model, Queues::Fetch.new]
+      }
 
       View = lambda { |model, tui|
         tui.layout(

@@ -24,19 +24,20 @@ module Sidekiq
     )
 
     Init = lambda {
+      tick = Rooibos::Command.tick(REFRESH_INTERVAL, :refresh)
+      home_model, home_cmd = Home::Init[]
       model = Ractor.make_shareable Model.new(
         active_tab: :home, showing: :main,
         stats: Stats::Record::EMPTY, stats_loading: true, redis_url: 'N/A', error: nil,
-        home: Home::Init[],
-        busy: Busy::Init[],
-        queues: Queues::Init[],
-        scheduled: Scheduled::Init[],
-        retries: Retries::Init[],
-        dead: Dead::Init[],
-        metrics: Metrics::Init[]
+        home: home_model,
+        busy: Busy::Init[].first,
+        queues: Queues::Init[].first,
+        scheduled: Scheduled::Init[].first,
+        retries: Retries::Init[].first,
+        dead: Dead::Init[].first,
+        metrics: Metrics::Init[].first
       )
-      [model,
-       Rooibos::Command.batch(Stats::Fetch.new, RedisInfo::Fetch.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
+      [model, Rooibos::Command.batch(Stats::Fetch.new, home_cmd, tick)]
     }
 
     View = lambda { |model, tui|
@@ -74,15 +75,17 @@ module Sidekiq
     receive_events :left, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx - 1) % TAB_ORDER.size]
-      [model.with(active_tab: new_tab, error: nil, new_tab => TAB_MODULES[new_tab]::Init[]),
-       FetchCommandFor[model, new_tab]]
+      new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
+      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model),
+       Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
     receive_events :right, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx + 1) % TAB_ORDER.size]
-      [model.with(active_tab: new_tab, error: nil, new_tab => TAB_MODULES[new_tab]::Init[]),
-       FetchCommandFor[model, new_tab]]
+      new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
+      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model),
+       Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
     # --- Timer ---

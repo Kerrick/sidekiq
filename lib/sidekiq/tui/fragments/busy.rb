@@ -33,7 +33,8 @@ module Sidekiq
       end
 
       Init = lambda {
-        Ractor.make_shareable Model.new(loading: true, table: Table::Init[], processes: [], work_set_size: 0)
+        model = Ractor.make_shareable Model.new(loading: true, table: Table::Init[], processes: [], work_set_size: 0)
+        [model, Processes::Fetch.new]
       }
 
       View = lambda { |model, tui|

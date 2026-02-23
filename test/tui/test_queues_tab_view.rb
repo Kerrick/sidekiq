@@ -28,7 +28,7 @@ class TestQueuesView < Minitest::Test
       Sidekiq::TUI::Queues::Record.new(name: "critical", size: 7, latency: 0.02, paused: false),
       Sidekiq::TUI::Queues::Record.new(name: "mailers", size: 0, latency: 0.0, paused: false)
     ]
-    init = Sidekiq::TUI::Queues::Init[]
+    init = Sidekiq::TUI::Queues::Init[].first
     init.with(
       loading: false,
       table: init.table.with(row_ids: queues.map(&:name)),
@@ -40,7 +40,7 @@ class TestQueuesView < Minitest::Test
 
   def test_skeleton_state_snapshot
     with_test_terminal(120, 20) do
-      render_queues(Sidekiq::TUI::Queues::Init[])
+      render_queues(Sidekiq::TUI::Queues::Init[].first)
       assert_snapshots("queues_tab_skeleton")
     end
   end

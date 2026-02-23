@@ -12,13 +12,14 @@ module Sidekiq
       )
 
       Init = lambda {
-        Ractor.make_shareable Model.new(
+        model = Ractor.make_shareable Model.new(
           loading: true,
           chart_deltas_processed: Array.new(50, 0),
           chart_deltas_failed: Array.new(50, 0),
           previous_processed: 0, previous_failed: 0,
           redis_info: RedisInfo::Record::EMPTY
         )
+        [model, RedisInfo::Fetch.new]
       }
 
       View = lambda { |model, tui|
