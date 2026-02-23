@@ -26,7 +26,7 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_fill(1), tui.constraint_length(4)],
-          children: [RenderChart[model, tui], RenderRedis[model, tui]]
+          children: [ChartView[model, tui], RedisView[model, tui]]
         )
       }
 
@@ -48,7 +48,7 @@ module Sidekiq
         end
       }
 
-      RenderChart = lambda { |model, tui|
+      ChartView = lambda { |model, tui|
         y_max = [[model.chart_deltas_processed.max || 0, model.chart_deltas_failed.max || 0].max, 5].max
         proc_data = model.chart_deltas_processed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
         fail_data = model.chart_deltas_failed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
@@ -66,7 +66,7 @@ module Sidekiq
         )
       }
 
-      RenderRedis = lambda { |model, tui|
+      RedisView = lambda { |model, tui|
         keys = ['Version', 'Uptime', 'Connected Clients', 'Memory Usage', 'Peak Memory']
         vals = if model.loading
                  Array.new(5, '…')

@@ -41,7 +41,7 @@ module Sidekiq
     }
 
     View = lambda { |model, tui|
-      model.showing == :help ? RenderHelp[model, tui] : RenderMain[model, tui]
+      model.showing == :help ? HelpView[model, tui] : MainView[model, tui]
     }
 
     # --- Fragment routes ---
@@ -193,14 +193,14 @@ module Sidekiq
       COMMON_BINDINGS + tab_module.key_bindings
     }
 
-    RenderKeyBindings = lambda { |bindings, tui|
+    KeyBindingsView = lambda { |bindings, tui|
       bindings.flat_map do |binding|
         [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
          tui.text_span(content: ": #{binding.description}  ")]
       end
     }
 
-    RenderMain = lambda { |model, tui|
+    MainView = lambda { |model, tui|
       tab_bar = tui.tabs(
         titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
         selected_index: TAB_ORDER.index(model.active_tab),
@@ -234,7 +234,7 @@ module Sidekiq
                   TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
                 end
 
-      spans = RenderKeyBindings[ControlsForTab[model], tui]
+      spans = KeyBindingsView[ControlsForTab[model], tui]
       controls = tui.paragraph(
         text: [tui.text_line(spans: spans),
                tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
@@ -252,7 +252,7 @@ module Sidekiq
     ESC_BINDING = KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close')
     HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }].freeze
 
-    RenderHelp = lambda { |_, tui|
+    HelpView = lambda { |_, tui|
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
                    HELP_BINDINGS.map do |binding|
                      tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),

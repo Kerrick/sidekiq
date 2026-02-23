@@ -41,7 +41,7 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_length(4), tui.constraint_fill(1)],
-          children: [RenderStatus[model, tui], RenderProcesses[model, tui]]
+          children: [StatusView[model, tui], ProcessesView[model, tui]]
         )
       }
 
@@ -65,7 +65,7 @@ module Sidekiq
 
       Update = from_router
 
-      RenderStatus = lambda { |model, tui|
+      StatusView = lambda { |model, tui|
         keys = %w[Processes Threads Busy Utilization RSS]
         vals = if model.loading
                  Array.new(5, '…')
@@ -79,7 +79,7 @@ module Sidekiq
         )
       }
 
-      RenderProcesses = lambda { |model, tui|
+      ProcessesView = lambda { |model, tui|
         table = model.table
         rows = model.processes.map.with_index do |process, idx|
           display_name = process.name

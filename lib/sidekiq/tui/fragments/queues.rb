@@ -20,7 +20,7 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_fill(1)],
-          children: [RenderQueues[model, tui]]
+          children: [QueuesView[model, tui]]
         )
       }
 
@@ -43,7 +43,7 @@ module Sidekiq
 
       Update = from_router
 
-      RenderQueues = lambda { |model, tui|
+      QueuesView = lambda { |model, tui|
         table = model.table
         header = ['☑️', 'Queue', 'Size', 'Latency']
         header << 'Paused?' if model.pro

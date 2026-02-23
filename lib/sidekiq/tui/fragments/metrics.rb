@@ -26,7 +26,7 @@ module Sidekiq
         tui.layout(
           direction: :vertical,
           constraints: [tui.constraint_fill(1)],
-          children: [RenderChart[model, tui]]
+          children: [ChartView[model, tui]]
         )
       }
 
@@ -40,7 +40,7 @@ module Sidekiq
         end
       }
 
-      RenderChart = lambda { |model, tui|
+      ChartView = lambda { |model, tui|
         y_max = 5
         datasets = model.datasets.each_with_index.map do |ds, idx|
           actual_max = ds[:data].map { |_x, y| y }.max || 0
