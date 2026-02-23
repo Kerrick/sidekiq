@@ -260,15 +260,8 @@ module Sidekiq
       )
     }
 
-    HELP_BINDINGS = [
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Move between tabs'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'j/k', description: 'Use vim keys to move to prev/next row'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'x', description: 'Select/deselect current row'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'A', description: 'Select/deselect All visible rows'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'h/l', description: 'Use vim keys to move to prev/next page'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
-    ].freeze
+    ESC_BINDING = KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close')
+    HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }, *TABLE_BINDINGS].freeze
 
     RenderHelp = lambda { |_, tui|
       text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
