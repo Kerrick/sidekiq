@@ -10,14 +10,14 @@ require "rooibos/test_helper"
 
 require "sidekiq/tui"
 
-class TestQueuesTabView < Minitest::Test
+class TestQueuesView < Minitest::Test
   include Rooibos::TestHelper
 
   private
 
   def render_queues(model)
     tui = RatatuiRuby::TUI.new
-    widget = Sidekiq::TUI::QueuesTab::View.call(model, tui)
+    widget = Sidekiq::TUI::Queues::View.call(model, tui)
     RatatuiRuby.draw { |frame| frame.render_widget(widget, frame.area) }
     buffer_content
   end
@@ -28,7 +28,7 @@ class TestQueuesTabView < Minitest::Test
       Sidekiq::TUI::Queues::Record.new(name: "critical", size: 7, latency: 0.02, paused: false),
       Sidekiq::TUI::Queues::Record.new(name: "mailers", size: 0, latency: 0.0, paused: false)
     ]
-    init = Sidekiq::TUI::QueuesTab::Init[]
+    init = Sidekiq::TUI::Queues::Init[]
     init.with(
       loading: false,
       table: init.table.with(row_ids: queues.map(&:name)),
@@ -40,7 +40,7 @@ class TestQueuesTabView < Minitest::Test
 
   def test_skeleton_state_snapshot
     with_test_terminal(120, 20) do
-      render_queues(Sidekiq::TUI::QueuesTab::Init[])
+      render_queues(Sidekiq::TUI::Queues::Init[])
       assert_snapshots("queues_tab_skeleton")
     end
   end

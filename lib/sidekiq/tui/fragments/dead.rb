@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module DeadTab
+    module Dead
       include Rooibos::Router
 
       Controls = [
@@ -32,7 +32,7 @@ module Sidekiq
       forward_instances_of DeadFetched, to: :set, as: :data_received
 
       HandleAction = lambda { |message, model|
-        DebugLogger.info("DeadTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
+        DebugLogger.info("Dead HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete  then [model,
                             AlterSetRows.new(set_class_name: 'Sidekiq::DeadSet', ids: message.ids,
@@ -46,7 +46,7 @@ module Sidekiq
       intercept_instances_of TableFragment::ActionRequested, HandleAction
 
       HandleFetch = lambda { |message, model|
-        DebugLogger.info("DeadTab HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
+        DebugLogger.info("Dead HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model,
          FetchDeadSet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }

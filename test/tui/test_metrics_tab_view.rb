@@ -10,14 +10,14 @@ require "rooibos/test_helper"
 
 require "sidekiq/tui"
 
-class TestMetricsTabView < Minitest::Test
+class TestMetricsView < Minitest::Test
   include Rooibos::TestHelper
 
   private
 
   def render_metrics(model)
     tui = RatatuiRuby::TUI.new
-    widget = Sidekiq::TUI::MetricsTab::View.call(model, tui)
+    widget = Sidekiq::TUI::Metrics::View.call(model, tui)
     RatatuiRuby.draw { |frame| frame.render_widget(widget, frame.area) }
     buffer_content
   end
@@ -27,7 +27,7 @@ class TestMetricsTabView < Minitest::Test
     datasets = [
       { name: "HardWorker", data: Array.new(60) { |i| [i, 10] } }
     ]
-    init = Sidekiq::TUI::MetricsTab::Init[]
+    init = Sidekiq::TUI::Metrics::Init[]
     init.with(loading: false, datasets: datasets, starts_at: "16:00", ends_at: "17:00")
   end
 
@@ -35,7 +35,7 @@ class TestMetricsTabView < Minitest::Test
 
   def test_skeleton_state_snapshot
     with_test_terminal(120, 20) do
-      render_metrics(Sidekiq::TUI::MetricsTab::Init[])
+      render_metrics(Sidekiq::TUI::Metrics::Init[])
       assert_snapshots("metrics_tab_skeleton")
     end
   end

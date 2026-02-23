@@ -10,14 +10,14 @@ require "rooibos/test_helper"
 
 require "sidekiq/tui"
 
-class TestBusyTabView < Minitest::Test
+class TestBusyView < Minitest::Test
   include Rooibos::TestHelper
 
   private
 
   def render_busy(model)
     tui = RatatuiRuby::TUI.new
-    widget = Sidekiq::TUI::BusyTab::View.call(model, tui)
+    widget = Sidekiq::TUI::Busy::View.call(model, tui)
     RatatuiRuby.draw { |frame| frame.render_widget(widget, frame.area) }
     buffer_content
   end
@@ -35,7 +35,7 @@ class TestBusyTabView < Minitest::Test
         concurrency: 5, busy: 2, leader: false, stopping: false
       )
     ]
-    init = Sidekiq::TUI::BusyTab::Init[]
+    init = Sidekiq::TUI::Busy::Init[]
     init.with(
       loading: false,
       table: init.table.with(row_ids: processes.map(&:identity)),
@@ -47,7 +47,7 @@ class TestBusyTabView < Minitest::Test
 
   def test_skeleton_state_snapshot
     with_test_terminal(120, 20) do
-      render_busy(Sidekiq::TUI::BusyTab::Init[])
+      render_busy(Sidekiq::TUI::Busy::Init[])
       assert_snapshots("busy_tab_skeleton")
     end
   end

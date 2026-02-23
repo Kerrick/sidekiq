@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module QueuesTab
+    module Queues
       include Rooibos::Router
 
       Controls = [
@@ -26,7 +26,7 @@ module Sidekiq
       otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
-        DebugLogger.info("QueuesTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
+        DebugLogger.info("Queues HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete_queue
           [model, ClearQueue.new(queue_names: message.ids, tab: :queues)]

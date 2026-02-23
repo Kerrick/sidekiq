@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module HomeTab
+    module Home
       Controls = [].freeze
       FetchCommand = ->(_model) { [RedisInfo::Fetch.new] }
       Model = Data.define(

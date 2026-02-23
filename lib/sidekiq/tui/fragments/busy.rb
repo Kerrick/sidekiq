@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module BusyTab
+    module Busy
       include Rooibos::Router
 
       Controls = [
@@ -36,7 +36,7 @@ module Sidekiq
       otherwise route_to: :table
 
       intercept_instances_of TableFragment::ActionRequested, lambda { |message, model|
-        DebugLogger.info("BusyTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
+        DebugLogger.info("Busy HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :terminate
           [model, SignalProcess.new(identities: message.ids, signal: :terminate, tab: :busy)]
@@ -48,7 +48,7 @@ module Sidekiq
       }
 
       receive_instances_of Processes::Fetched, lambda { |message, model|
-        DebugLogger.info("BusyTab ProcessesFetched: #{message.processes.size} processes")
+        DebugLogger.info("Busy ProcessesFetched: #{message.processes.size} processes")
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }

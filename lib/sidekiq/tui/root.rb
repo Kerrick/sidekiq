@@ -7,8 +7,8 @@ module Sidekiq
     REFRESH_INTERVAL = 2.0
 
     TAB_MODULES = {
-      home: HomeTab, busy: BusyTab, queues: QueuesTab, scheduled: ScheduledTab,
-      retries: RetriesTab, dead: DeadTab, metrics: MetricsTab
+      home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
+      retries: Retries, dead: Dead, metrics: Metrics
     }.freeze
 
     Model = Data.define(
@@ -20,13 +20,13 @@ module Sidekiq
       model = Ractor.make_shareable Model.new(
         active_tab: :home, showing: :main,
         stats: Stats::Record::EMPTY, stats_loading: true, redis_url: 'N/A', error: nil,
-        home: HomeTab::Init[],
-        busy: BusyTab::Init[],
-        queues: QueuesTab::Init[],
-        scheduled: ScheduledTab::Init[],
-        retries: RetriesTab::Init[],
-        dead: DeadTab::Init[],
-        metrics: MetricsTab::Init[]
+        home: Home::Init[],
+        busy: Busy::Init[],
+        queues: Queues::Init[],
+        scheduled: Scheduled::Init[],
+        retries: Retries::Init[],
+        dead: Dead::Init[],
+        metrics: Metrics::Init[]
       )
       [model,
        Rooibos::Command.batch(Stats::Fetch.new, RedisInfo::Fetch.new, Rooibos::Command.tick(REFRESH_INTERVAL, :refresh))]
@@ -38,13 +38,13 @@ module Sidekiq
 
     # --- Fragment routes ---
 
-    route :home, to: HomeTab
-    route :busy, to: BusyTab
-    route :queues, to: QueuesTab
-    route :scheduled, to: ScheduledTab
-    route :retries, to: RetriesTab
-    route :dead, to: DeadTab
-    route :metrics, to: MetricsTab
+    route :home, to: Home
+    route :busy, to: Busy
+    route :queues, to: Queues
+    route :scheduled, to: Scheduled
+    route :retries, to: Retries
+    route :dead, to: Dead
+    route :metrics, to: Metrics
 
     # --- Help overlay (modal — swallows all events) ---
 

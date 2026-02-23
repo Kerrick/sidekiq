@@ -11,15 +11,15 @@ require "rooibos/test_helper"
 # Require the TUI (loads Rooibos, RatatuiRuby, and all tab modules)
 require "sidekiq/tui"
 
-class TestScheduledTabView < Minitest::Test
+class TestScheduledView < Minitest::Test
   include Rooibos::TestHelper
 
   private
 
-  # Renders the ScheduledTab::View into the test terminal buffer and returns buffer_content.
+  # Renders the Scheduled::View into the test terminal buffer and returns buffer_content.
   def render_scheduled(model)
     tui = RatatuiRuby::TUI.new
-    widget = Sidekiq::TUI::ScheduledTab::View.call(model, tui)
+    widget = Sidekiq::TUI::Scheduled::View.call(model, tui)
     RatatuiRuby.draw { |frame| frame.render_widget(widget, frame.area) }
     buffer_content
   end
@@ -44,7 +44,7 @@ class TestScheduledTabView < Minitest::Test
       },
       table: set_model.table.with(row_ids: Array.new(25) { |i| "#{1000 + i}.0|job#{i}" })
     )
-    Sidekiq::TUI::ScheduledTab::Model.new(set: loaded_set)
+    Sidekiq::TUI::Scheduled::Model.new(set: loaded_set)
   end
 
   def normalize_timestamp(lines)
@@ -55,7 +55,7 @@ class TestScheduledTabView < Minitest::Test
 
   def test_init_state_snapshot
     with_test_terminal(120, 30) do
-      render_scheduled(Sidekiq::TUI::ScheduledTab::Init[])
+      render_scheduled(Sidekiq::TUI::Scheduled::Init[])
       assert_snapshots("scheduled_tab_init", &method(:normalize_timestamp))
     end
   end
@@ -76,7 +76,7 @@ class TestScheduledTabView < Minitest::Test
     loaded_lines = nil
 
     with_test_terminal(120, 30) do
-      init_lines = render_scheduled(Sidekiq::TUI::ScheduledTab::Init[])
+      init_lines = render_scheduled(Sidekiq::TUI::Scheduled::Init[])
     end
 
     with_test_terminal(120, 30) do

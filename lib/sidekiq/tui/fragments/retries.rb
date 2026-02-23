@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module RetriesTab
+    module Retries
       include Rooibos::Router
 
       Controls = [
@@ -33,7 +33,7 @@ module Sidekiq
       forward_instances_of RetriesFetched, to: :set, as: :data_received
 
       HandleAction = lambda { |message, model|
-        DebugLogger.info("RetriesTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
+        DebugLogger.info("Retries HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete then [model,
                            AlterSetRows.new(set_class_name: 'Sidekiq::RetrySet', ids: message.ids,
@@ -50,7 +50,7 @@ module Sidekiq
       intercept_instances_of TableFragment::ActionRequested, HandleAction
 
       HandleFetch = lambda { |message, model|
-        DebugLogger.info("RetriesTab HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
+        DebugLogger.info("Retries HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model,
          FetchRetrySet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }

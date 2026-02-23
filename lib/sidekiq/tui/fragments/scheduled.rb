@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module ScheduledTab
+    module Scheduled
       include Rooibos::Router
 
       Controls = [
@@ -35,7 +35,7 @@ module Sidekiq
 
       # Outward: intercept action bubbles from TableFragment
       HandleAction = lambda { |message, model|
-        DebugLogger.info("ScheduledTab HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
+        DebugLogger.info("Scheduled HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
         case message.action
         when :delete  then [model,
                             AlterSetRows.new(set_class_name: 'Sidekiq::ScheduledSet', ids: message.ids,
@@ -53,7 +53,7 @@ module Sidekiq
 
       # Outward: intercept pagination bubbles from SetFragment
       HandleFetch = lambda { |message, model|
-        DebugLogger.info("ScheduledTab HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
+        DebugLogger.info("Scheduled HandleFetch: filter=#{message.filter} page=#{message.pager_page}")
         [model,
          FetchScheduledSet.new(filter: message.filter, pager_page: message.pager_page, pager_size: message.pager_size)]
       }

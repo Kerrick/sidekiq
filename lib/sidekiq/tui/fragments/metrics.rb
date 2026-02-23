@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module MetricsTab
+    module Metrics
       Controls = [].freeze
       FetchCommand = lambda { |model|
         if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
