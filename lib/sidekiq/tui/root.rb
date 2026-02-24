@@ -19,16 +19,18 @@ module Sidekiq
     }.freeze
 
     Model = Data.define(
-      :active_tab, :showing, :stats, :stats_loading, :redis_url, :error,
+      :active_tab, :stats, :help, :error,
       :home, :busy, :queues, :scheduled, :retries, :dead, :metrics
     )
 
     Init = lambda {
       tick = Rooibos::Command.tick(REFRESH_INTERVAL, :refresh)
       home_model, home_cmd = Home::Init[]
+      stats_model, stats_cmd = Stats::Init[]
+      help_model, _help_cmd = Help::Init[]
       model = Ractor.make_shareable Model.new(
-        active_tab: :home, showing: :main,
-        stats: Stats::Record::EMPTY, stats_loading: true, redis_url: 'N/A', error: nil,
+        active_tab: :home,
+        stats: stats_model, help: help_model, error: nil,
         home: home_model,
         busy: Busy::Init[].first,
         queues: Queues::Init[].first,
@@ -37,11 +39,44 @@ module Sidekiq
         dead: Dead::Init[].first,
         metrics: Metrics::Init[].first
       )
-      [model, Rooibos::Command.batch(Stats::Fetch.new, home_cmd, tick)]
+      [model, Rooibos::Command.batch(stats_cmd, home_cmd, tick)]
     }
 
     View = lambda { |model, tui|
-      model.showing == :help ? HelpView[model, tui] : MainView[model, tui]
+      if model.help.expanded
+        Help::ExpandedView[model.help, tui]
+      else
+        tab_bar = tui.tabs(
+          titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
+          selected_index: TAB_ORDER.index(model.active_tab),
+          block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
+          divider: ' | ', highlight_style: Styles::HIGHLIGHT
+        )
+        stats_view = Stats::View[model.stats, tui]
+        content = if model.error
+                    ErrorView[model.error, tui]
+                  else
+                    TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
+                  end
+        controls = Help::CollapsedView[model.help, model.active_tab, model.stats.redis_url, tui]
+        tui.layout(
+          direction: :vertical,
+          constraints: [tui.constraint_length(3), tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
+          children: [tab_bar, stats_view, content, controls]
+        )
+      end
+    }
+
+    ErrorView = lambda { |error, tui|
+      error_msg = error.respond_to?(:error_message) ? error.error_message : error.to_s
+      error_bt = error.respond_to?(:backtrace) ? Array(error.backtrace) : []
+      header = [tui.text_line(
+        spans: [tui.text_span(content: error_msg, style: RatatuiRuby::Style::Style.new(modifiers: [:bold]))],
+        alignment: :center
+      )]
+      lines = error_bt.map { |line| tui.text_line(spans: [tui.text_span(content: line)]) }
+      tui.paragraph(text: header + lines, alignment: :left,
+                    block: tui.block(title: 'Error', borders: [:all], border_style: Styles::ERR_BORDER))
     }
 
     # --- Fragment routes ---
@@ -56,8 +91,8 @@ module Sidekiq
 
     # --- Help overlay (modal — swallows all events) ---
 
-    only when: ->(_, model) { model.showing == :help } do
-      receive_events %i[esc ?], ->(_, model) { model.with(showing: :main) }
+    only when: ->(_, model) { model.help.expanded } do
+      receive_events %i[esc ?], ->(_, model) { model.with(help: model.help.with(expanded: false)) }
       receive_instances_of RatatuiRuby::Event, ->(_, _) { nil }
     end
 
@@ -69,7 +104,7 @@ module Sidekiq
     action :quit, -> { Rooibos::Command.exit }
     only when: ->(_, model) { !IsSetFiltering[nil, model] } do
       receive_events %i[q ctrl_c], :quit
-      receive_events :"?", ->(_, model) { model.with(showing: :help) }
+      receive_events :"?", ->(_, model) { model.with(help: model.help.with(expanded: true)) }
     end
 
     receive_events :left, lambda { |_, model|
@@ -100,7 +135,7 @@ module Sidekiq
     # --- Data fetch results ---
 
     observe_instances_of Stats::Fetched, lambda { |message, model|
-      model.with(stats: message.stats, stats_loading: false, redis_url: message.redis_url)
+      model.with(stats: Stats::Update[message, model.stats])
     }
 
     forward_instances_of Stats::Fetched, to: :home
@@ -179,95 +214,6 @@ module Sidekiq
       Rooibos::Command.batch(Stats::Fetch.new, *tab_module::FetchCommand[tab_model])
     }
 
-    COMMON_BINDINGS = [
-      KeyBinding.new(key: nil, semantic: nil, display_key: '?', description: 'Help'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Select Tab'),
-      KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
-    ].freeze
 
-    ControlsForTab = lambda { |model|
-      tab = model.active_tab
-      tab_module = TAB_MODULES[tab]
-      return COMMON_BINDINGS if model.active_tab == :home
-
-      COMMON_BINDINGS + tab_module.key_bindings
-    }
-
-    KeyBindingsView = lambda { |bindings, tui|
-      bindings.flat_map do |binding|
-        [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
-         tui.text_span(content: ": #{binding.description}  ")]
-      end
-    }
-
-    MainView = lambda { |model, tui|
-      tab_bar = tui.tabs(
-        titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
-        selected_index: TAB_ORDER.index(model.active_tab),
-        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
-        divider: ' | ', highlight_style: Styles::HIGHLIGHT
-      )
-
-      stats_keys = %w[Processed Failed Busy Enqueued Retries Scheduled Dead]
-      stats_vals = if model.stats_loading
-                     Array.new(7, '…')
-                   else
-                     [model.stats.processed, model.stats.failed, model.stats.busy, model.stats.enqueued,
-                      model.stats.retries, model.stats.scheduled, model.stats.dead]
-                   end
-      stats = tui.paragraph(
-        text: [stats_keys.map { |k| k.ljust(12) }.join('  '), stats_vals.map { |v| v.to_s.ljust(12) }.join('  ')],
-        block: tui.block(title: 'Statistics', borders: [:all])
-      )
-
-      content = if model.error
-                  error_msg = model.error.respond_to?(:error_message) ? model.error.error_message : model.error.to_s
-                  error_bt = model.error.respond_to?(:backtrace) ? Array(model.error.backtrace) : []
-                  header = [tui.text_line(
-                    spans: [tui.text_span(content: error_msg, style: RatatuiRuby::Style::Style.new(modifiers: [:bold]))],
-                    alignment: :center
-                  )]
-                  lines = error_bt.map { |line| tui.text_line(spans: [tui.text_span(content: line)]) }
-                  tui.paragraph(text: header + lines, alignment: :left,
-                                block: tui.block(title: 'Error', borders: [:all], border_style: Styles::ERR_BORDER))
-                else
-                  TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
-                end
-
-      spans = KeyBindingsView[ControlsForTab[model], tui]
-      controls = tui.paragraph(
-        text: [tui.text_line(spans: spans),
-               tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
-                                     tui.text_span(content: "Current Time: #{Time.now.utc}")])],
-        block: tui.block(title: 'Controls', borders: [:all])
-      )
-
-      tui.layout(
-        direction: :vertical,
-        constraints: [tui.constraint_length(3), tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
-        children: [tab_bar, stats, content, controls]
-      )
-    }
-
-    ESC_BINDING = KeyBinding.new(key: nil, semantic: nil, display_key: 'Esc', description: 'Close')
-    HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }].freeze
-
-    HelpView = lambda { |_, tui|
-      text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
-                   HELP_BINDINGS.map do |binding|
-                     tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
-                                           tui.text_span(content: ": #{binding.description}")])
-                   end
-      content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE,
-                          children: [tui.paragraph(text: text_lines)])
-      ctrl = tui.paragraph(
-        text: [tui.text_line(spans: [tui.text_span(content: 'Esc', style: Styles::HOTKEY),
-                                     tui.text_span(content: ': Close  ')])],
-        block: tui.block(title: 'Controls', borders: [:all])
-      )
-      tui.layout(direction: :vertical,
-                 constraints: [tui.constraint_fill(1), tui.constraint_length(4)],
-                 children: [content, ctrl])
-    }
   end
 end

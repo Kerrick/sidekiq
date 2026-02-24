@@ -31,6 +31,8 @@ require_relative 'tui/fragments/scheduled'
 require_relative 'tui/fragments/retries'
 require_relative 'tui/fragments/dead'
 require_relative 'tui/fragments/metrics'
+require_relative 'tui/fragments/stats'
+require_relative 'tui/fragments/help'
 require_relative 'tui/root'
 
 DebugLogger = Logger.new('tui.log')
