@@ -43,28 +43,25 @@ module Sidekiq
     }
 
     View = lambda { |model, tui|
-      if model.help.expanded
-        Help::ExpandedView[model.help, tui]
-      else
-        tab_bar = tui.tabs(
-          titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
-          selected_index: TAB_ORDER.index(model.active_tab),
-          block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
-          divider: ' | ', highlight_style: Styles::HIGHLIGHT
-        )
-        stats_view = Stats::View[model.stats, tui]
-        content = if model.error
-                    ErrorView[model.error, tui]
-                  else
-                    TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
-                  end
-        controls = Help::CollapsedView[model.help, model.active_tab, model.stats.redis_url, tui]
-        tui.layout(
-          direction: :vertical,
-          constraints: [tui.constraint_length(3), tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
-          children: [tab_bar, stats_view, content, controls]
-        )
-      end
+      tab_bar = tui.tabs(
+        titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
+        selected_index: TAB_ORDER.index(model.active_tab),
+        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
+        divider: ' | ', highlight_style: Styles::HIGHLIGHT
+      )
+      stats_view = Stats::View[model.stats, tui]
+      content = if model.error
+                  ErrorView[model.error, tui]
+                else
+                  TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
+                end
+      controls = Help::ControlsView[model.help, tui]
+      base = tui.layout(
+        direction: :vertical,
+        constraints: [tui.constraint_length(3), tui.constraint_length(4), tui.constraint_fill(1), tui.constraint_length(4)],
+        children: [tab_bar, stats_view, content, controls]
+      )
+      Help::View[model.help, tui, base]
     }
 
     ErrorView = lambda { |error, tui|
@@ -111,7 +108,8 @@ module Sidekiq
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx - 1) % TAB_ORDER.size]
       new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model),
+      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model,
+                  help: model.help.with(active_tab: new_tab)),
        Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
@@ -119,7 +117,8 @@ module Sidekiq
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx + 1) % TAB_ORDER.size]
       new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model),
+      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model,
+                  help: model.help.with(active_tab: new_tab)),
        Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
@@ -135,7 +134,8 @@ module Sidekiq
     # --- Data fetch results ---
 
     observe_instances_of Stats::Fetched, lambda { |message, model|
-      model.with(stats: Stats::Update[message, model.stats])
+      new_stats = Stats::Update[message, model.stats]
+      model.with(stats: new_stats, help: model.help.with(redis_url: new_stats.redis_url))
     }
 
     forward_instances_of Stats::Fetched, to: :home

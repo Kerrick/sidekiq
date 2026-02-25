@@ -3,10 +3,10 @@
 module Sidekiq
   module TUI
     module Help
-      Model = Data.define(:expanded)
+      Model = Data.define(:expanded, :active_tab, :redis_url)
 
       Init = lambda {
-        [Ractor.make_shareable(Model.new(expanded: false)), nil]
+        [Ractor.make_shareable(Model.new(expanded: false, active_tab: :home, redis_url: 'N/A')), nil]
       }
 
       ESC_BINDING = KeyBinding.new(
@@ -19,7 +19,13 @@ module Sidekiq
         KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
       ].freeze
 
-      HELP_BINDINGS = [ESC_BINDING, *COMMON_BINDINGS.reject { |b| b.display_key == '?' }].freeze
+      AllBindings = lambda {
+        @all_bindings ||= [
+          ESC_BINDING,
+          *Sidekiq::TUI::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
+          *COMMON_BINDINGS.reject { |b| b.display_key == '?' }
+        ].uniq(&:display_key).freeze
+      }
 
       ControlsFor = lambda { |active_tab|
         tab_module = TAB_MODULES[active_tab]
@@ -35,19 +41,30 @@ module Sidekiq
         end
       }
 
-      CollapsedView = lambda { |_model, active_tab, redis_url, tui|
-        spans = KeyBindingsView[ControlsFor[active_tab], tui]
+      # Primary entry point — wraps base widget with help overlay when expanded.
+      View = lambda { |model, tui, base|
+        if model.expanded
+          tui.overlay(layers: [base, tui.clear, ExpandedView[model, tui]])
+        else
+          base
+        end
+      }
+
+      # Controls bar — rendered by root as the bottom child of its layout.
+      ControlsView = lambda { |model, tui|
+        spans = KeyBindingsView[ControlsFor[model.active_tab], tui]
         tui.paragraph(
           text: [tui.text_line(spans: spans),
-                 tui.text_line(spans: [tui.text_span(content: "Redis: #{redis_url} "),
+                 tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
                                        tui.text_span(content: "Current Time: #{Time.now.utc}")])],
           block: tui.block(title: 'Controls', borders: [:all])
         )
       }
 
+      # Full help overlay — hardcoded bindings matching upstream (not context-sensitive).
       ExpandedView = lambda { |_model, tui|
         text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
-                     HELP_BINDINGS.map do |binding|
+                     AllBindings[].map do |binding|
                        tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
                                              tui.text_span(content: ": #{binding.description}")])
                      end
