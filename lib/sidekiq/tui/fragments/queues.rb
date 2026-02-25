@@ -7,8 +7,8 @@ module Sidekiq
       has_table
       fetch_command Queues::Fetch
 
-      map :delete_queue,  :shift_D, 'Delete'
-      map :toggle_pause,  :p,       'Pause/Unpause Queue'
+      map :delete_queue,  :shift_D, 'Delete',             'Delete selected queue'
+      map :toggle_pause,  :p,       'Pause/Unpause Queue', 'Pause/Unpause Queue'
 
       Model = Data.define(:loading, :table, :queues, :pro)
       Init = lambda {

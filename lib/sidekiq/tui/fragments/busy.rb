@@ -7,8 +7,8 @@ module Sidekiq
       has_table
       fetch_command Processes::Fetch
 
-      map :terminate, :shift_T, 'Terminate'
-      map :quiet,     :shift_Q, 'Quiet'
+      map :terminate, :shift_T, 'Terminate', 'Terminate selected processes'
+      map :quiet,     :shift_Q, 'Quiet',     'Quiet selected processes'
 
       class Model < Data.define(:loading, :table, :processes, :work_set_size)
         def total_concurrency = processes.sum(&:concurrency)

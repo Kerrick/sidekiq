@@ -6,10 +6,10 @@ module Sidekiq
       include Tab
       has_set
 
-      map :delete,       :shift_D, 'Delete'
-      map :enqueue,      :shift_E, 'Enqueue'
-      map :kill,         :shift_K, 'Kill'
-      map :start_filter, "/",      'Filter'
+      map :delete,       :shift_D, 'Delete',  'Delete selected entries'
+      map :enqueue,      :shift_E, 'Enqueue', 'Enqueue selected entries'
+      map :kill,         :shift_K, 'Kill',    'Kill selected entries'
+      map :start_filter, "/",      'Filter',  'Filter entries'
 
       FetchCommand = lambda { |model|
         [FetchScheduledSet.new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,

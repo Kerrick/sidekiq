@@ -29,9 +29,9 @@ module Sidekiq
           const_set(:FetchCommand, ->(_model) { [fetch_class.new] })
         end
 
-        def map(semantic, key, description)
+        def map(semantic, key, description, help)
           display_key = key.to_s.delete_prefix('shift_')
-          @key_bindings << KeyBinding.new(key:, semantic:, display_key:, description:)
+          @key_bindings << KeyBinding.new(key:, semantic:, display_key:, description:, help:)
         end
 
         def key_bindings = @key_bindings.freeze
@@ -39,12 +39,12 @@ module Sidekiq
         private
 
         def register_table_bindings
-          map :prev_page,         :h,       'Prev/Next Page'
-          map :next_page,         :l,       'Prev/Next Page'
-          map :row_up,            :k,       'Prev/Next Row'
-          map :row_down,          :j,       'Prev/Next Row'
-          map :toggle_select,     :x,       'Select'
-          map :toggle_select_all, :shift_A, 'Select All'
+          map :prev_page,         :h,       'Prev/Next Page', 'Use vim keys to move to prev/next page'
+          map :next_page,         :l,       'Prev/Next Page', 'Use vim keys to move to prev/next page'
+          map :row_up,            :k,       'Prev/Next Row',  'Use vim keys to move to prev/next row'
+          map :row_down,          :j,       'Prev/Next Row',  'Use vim keys to move to prev/next row'
+          map :toggle_select,     :x,       'Select',         'Select/deselect current row'
+          map :toggle_select_all, :shift_A, 'Select All',     'Select/deselect All visible rows'
         end
       end
     end

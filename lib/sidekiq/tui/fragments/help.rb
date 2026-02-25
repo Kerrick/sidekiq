@@ -10,13 +10,13 @@ module Sidekiq
       }
 
       ESC_BINDING = KeyBinding.new(
-        key: nil, semantic: nil, display_key: 'Esc', description: 'Close'
+        key: nil, semantic: nil, display_key: 'Esc', description: 'Close', help: 'Close'
       )
 
       COMMON_BINDINGS = [
-        KeyBinding.new(key: nil, semantic: nil, display_key: '?', description: 'Help'),
-        KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Select Tab'),
-        KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit')
+        KeyBinding.new(key: nil, semantic: nil, display_key: '?', description: 'Help', help: 'Help'),
+        KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Select Tab', help: 'Move between tabs'),
+        KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit', help: 'Quit')
       ].freeze
 
       AllBindings = lambda {
@@ -66,7 +66,7 @@ module Sidekiq
         text_lines = [tui.text_line(spans: ['Welcome to the Sidekiq Terminal UI'], alignment: :center)] +
                      AllBindings[].map do |binding|
                        tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
-                                             tui.text_span(content: ": #{binding.description}")])
+                                             tui.text_span(content: ": #{binding.help}")])
                      end
         content = tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE,
                             children: [tui.paragraph(text: text_lines)])
