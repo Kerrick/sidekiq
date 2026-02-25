@@ -6,21 +6,21 @@ module Sidekiq
 
     REFRESH_INTERVAL = 2.0
 
-    TAB_ORDER = %i[home busy queues scheduled retries dead metrics].freeze
+    TAB_ORDER = %i[home busy queues scheduled retry dead metrics].freeze
     TAB_NAMES = {
       home: 'Home', busy: 'Busy', queues: 'Queues', scheduled: 'Scheduled',
-      retries: 'Retries', dead: 'Dead', metrics: 'Metrics'
+      retry: 'Retries', dead: 'Dead', metrics: 'Metrics'
     }.freeze
-    SET_TABS = %i[scheduled retries dead].freeze
+    SET_TABS = %i[scheduled retry dead].freeze
 
     TAB_MODULES = {
       home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
-      retries: Retries, dead: Dead, metrics: Metrics
+      retry: Retry, dead: Dead, metrics: Metrics
     }.freeze
 
     Model = Data.define(
       :active_tab, :stats, :help, :error,
-      :home, :busy, :queues, :scheduled, :retries, :dead, :metrics
+      :home, :busy, :queues, :scheduled, :retry, :dead, :metrics
     )
 
     Init = lambda {
@@ -35,7 +35,7 @@ module Sidekiq
         busy: Busy::Init[].first,
         queues: Queues::Init[].first,
         scheduled: Scheduled::Init[].first,
-        retries: Retries::Init[].first,
+        retry: Retry::Init[].first,
         dead: Dead::Init[].first,
         metrics: Metrics::Init[].first
       )
@@ -82,7 +82,7 @@ module Sidekiq
     route :busy, to: Busy
     route :queues, to: Queues
     route :scheduled, to: Scheduled
-    route :retries, to: Retries
+    route :retry, to: Retry
     route :dead, to: Dead
     route :metrics, to: Metrics
 
@@ -140,12 +140,12 @@ module Sidekiq
 
     forward_instances_of Stats::Fetched, to: :home
     forward_instances_of RedisInfo::Fetched, to: :home
-    forward_instances_of Processes::Fetched, to: :busy
+    forward_instances_of Busy::Fetched, to: :busy
     forward_instances_of Queues::Fetched, to: :queues
-    forward_instances_of ScheduledFetched, to: :scheduled
-    forward_instances_of RetriesFetched, to: :retries
-    forward_instances_of DeadFetched, to: :dead
-    forward_instances_of MetricsFetched, to: :metrics
+    forward_instances_of Scheduled::Fetched, to: :scheduled
+    forward_instances_of Retry::Fetched, to: :retry
+    forward_instances_of Dead::Fetched, to: :dead
+    forward_instances_of Metrics::Fetched, to: :metrics
 
     receive_instances_of DataFetchError, lambda { |message, model|
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
@@ -160,7 +160,7 @@ module Sidekiq
       tab_model = model.public_send(tab)
 
       # Clear succeeded_ids from the nested table's selection.
-      # Set tabs (scheduled/retries/dead) have .set.table; others have .table directly.
+      # Set tabs (scheduled/retry/dead) have .set.table; others have .table directly.
       updated = if tab_model.respond_to?(:set)
                   old_table = tab_model.set.table
                   new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
@@ -188,7 +188,7 @@ module Sidekiq
 
     only when: IsSetFiltering do
       otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
-      otherwise route_to: :retries,   when: ->(_, model) { model.active_tab == :retries }
+      otherwise route_to: :retry,     when: ->(_, model) { model.active_tab == :retry }
       otherwise route_to: :dead,      when: ->(_, model) { model.active_tab == :dead }
     end
 
@@ -211,7 +211,7 @@ module Sidekiq
     FetchCommandFor = lambda { |model, tab|
       tab_model = model.public_send(tab)
       tab_module = TAB_MODULES[tab]
-      Rooibos::Command.batch(Stats::Fetch.new, *tab_module::FetchCommand[tab_model])
+      Rooibos::Command.batch(Stats::Fetch.new, *tab_module::Fetch.from_model(tab_model))
     }
 
 

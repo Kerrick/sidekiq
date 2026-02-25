@@ -5,7 +5,6 @@ module Sidekiq
     module Queues
       include Tab
       has_table
-      fetch_command Queues::Fetch
 
       map :delete_queue,  :shift_D, 'Delete',             'Delete selected queue'
       map :toggle_pause,  :p,       'Pause/Unpause Queue', 'Pause/Unpause Queue'

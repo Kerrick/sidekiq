@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    module Processes
+    module Busy
       # Immutable record of process data.
       # Pure readonly methods for domain logic; display formatting stays in the View.
       class Record < Data.define(:hostname, :pid, :started_at, :rss_kb, :concurrency, :busy, :identity, :leader,
@@ -28,6 +28,8 @@ module Sidekiq
 
       class Fetch < Data.define
         include Rooibos::Command::Custom
+
+        def self.from_model(_model) = [new]
 
         def call(out, _token)
           processes = []

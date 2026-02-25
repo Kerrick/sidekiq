@@ -11,16 +11,10 @@ module Sidekiq
 
       Init = lambda {
         model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
-        [model, FetchJobMetrics.new]
+        [model, Metrics::Fetch.new]
       }
 
-      FetchCommand = lambda { |model|
-        if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
-          [FetchJobMetrics.new]
-        else
-          []
-        end
-      }
+
 
       View = lambda { |model, tui|
         tui.layout(
@@ -32,7 +26,7 @@ module Sidekiq
 
       Update = lambda { |message, model|
         case message
-        in MetricsFetched
+        in Metrics::Fetched
           model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
                      ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
         else

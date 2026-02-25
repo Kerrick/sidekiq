@@ -24,12 +24,12 @@ class TestBusyView < Minitest::Test
 
   def loaded_model
     processes = [
-      Sidekiq::TUI::Processes::Record.new(
+      Sidekiq::TUI::Busy::Record.new(
         identity: "worker1:1234:abc", hostname: "worker1", pid: "1234",
         started_at: Time.utc(2026, 2, 22, 16, 0, 0), rss_kb: 102_400,
         concurrency: 10, busy: 3, leader: true, stopping: false
       ),
-      Sidekiq::TUI::Processes::Record.new(
+      Sidekiq::TUI::Busy::Record.new(
         identity: "worker2:5678:def", hostname: "worker2", pid: "5678",
         started_at: Time.utc(2026, 2, 22, 17, 0, 0), rss_kb: 51_200,
         concurrency: 5, busy: 2, leader: false, stopping: false

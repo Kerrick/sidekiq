@@ -4,22 +4,18 @@ require 'sidekiq/paginator'
 
 module Sidekiq
   module TUI
-    # Three message types — one per set tab — for type-based routing.
-    class ScheduledFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
-      include Rooibos::Message::Predicates
-    end
-
-    class RetriesFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
-      include Rooibos::Message::Predicates
-    end
-
-    class DeadFetched < Data.define(:rows, :row_ids, :current_page, :total, :next_page, :pager_page, :pager_size)
-      include Rooibos::Message::Predicates
-    end
-
-    # Shared fetch logic for all three sorted set commands.
-    module FetchSetLogic
+    # Base class for sorted-set fetch commands. Subclasses need only
+    # define `call` to specify their Sidekiq set class and Fetched class.
+    class FetchSet < Data.define(:filter, :pager_page, :pager_size)
+      include Rooibos::Command::Custom
       include Sidekiq::Paginator
+
+      def self.from_model(model)
+        [new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
+             pager_size: model.set.pager.size)]
+      end
+
+      private
 
       def fetch_set(out, set_class, message_class)
         DebugLogger.info("FetchSet: #{message_class} filter=#{filter} page=#{pager_page} size=#{pager_size}")
@@ -56,24 +52,6 @@ module Sidekiq
         out.put(Ractor.make_shareable(DataFetchError.new(error_message: e.message,
                                                          backtrace: e.backtrace&.first(10))))
       end
-    end
-
-    class FetchScheduledSet < Data.define(:filter, :pager_page, :pager_size)
-      include Rooibos::Command::Custom
-      include FetchSetLogic
-      def call(out, _token) = fetch_set(out, Sidekiq::ScheduledSet, ScheduledFetched)
-    end
-
-    class FetchRetrySet < Data.define(:filter, :pager_page, :pager_size)
-      include Rooibos::Command::Custom
-      include FetchSetLogic
-      def call(out, _token) = fetch_set(out, Sidekiq::RetrySet, RetriesFetched)
-    end
-
-    class FetchDeadSet < Data.define(:filter, :pager_page, :pager_size)
-      include Rooibos::Command::Custom
-      include FetchSetLogic
-      def call(out, _token) = fetch_set(out, Sidekiq::DeadSet, DeadFetched)
     end
   end
 end

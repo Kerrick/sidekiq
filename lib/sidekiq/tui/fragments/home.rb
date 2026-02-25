@@ -4,7 +4,6 @@ module Sidekiq
   module TUI
     module Home
       include Tab
-      fetch_command RedisInfo::Fetch
 
       Model = Data.define(
         :loading, :chart_deltas_processed, :chart_deltas_failed,
@@ -19,7 +18,7 @@ module Sidekiq
           previous_processed: 0, previous_failed: 0,
           redis_info: RedisInfo::Record::EMPTY
         )
-        [model, RedisInfo::Fetch.new]
+        [model, Home::Fetch.new]
       }
 
       View = lambda { |model, tui|

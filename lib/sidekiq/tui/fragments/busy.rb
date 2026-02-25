@@ -5,7 +5,6 @@ module Sidekiq
     module Busy
       include Tab
       has_table
-      fetch_command Processes::Fetch
 
       map :terminate, :shift_T, 'Terminate', 'Terminate selected processes'
       map :quiet,     :shift_Q, 'Quiet',     'Quiet selected processes'
@@ -34,7 +33,7 @@ module Sidekiq
 
       Init = lambda {
         model = Ractor.make_shareable Model.new(loading: true, table: Table::Init[], processes: [], work_set_size: 0)
-        [model, Processes::Fetch.new]
+        [model, Busy::Fetch.new]
       }
 
       View = lambda { |model, tui|
@@ -57,8 +56,8 @@ module Sidekiq
         end
       }
 
-      receive_instances_of Processes::Fetched, lambda { |message, model|
-        DebugLogger.info("Busy ProcessesFetched: #{message.processes.size} processes")
+      receive_instances_of Busy::Fetched, lambda { |message, model|
+        DebugLogger.info("Busy Fetched: #{message.processes.size} processes")
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }

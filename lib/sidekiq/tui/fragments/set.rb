@@ -11,9 +11,6 @@ module Sidekiq
       )
     end
 
-    SET_CLASS_NAMES = {
-      scheduled: 'Sidekiq::ScheduledSet', retries: 'Sidekiq::RetrySet', dead: 'Sidekiq::DeadSet'
-    }.freeze
 
 
     # Shared sorted-set fragment, nested inside each set tab.
@@ -58,7 +55,7 @@ module Sidekiq
       # --- Data arrival (forwarded from parent with as: :data_received) ---
 
       ApplyData = lambda { |message, model|
-        data = message.event # the original ScheduledFetched / RetriesFetched / DeadFetched
+        data = message.event # the original Scheduled::Fetched / Retry::Fetched / Dead::Fetched
         DebugLogger.info("Set ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
         new_table = model.table.with(row_ids: data.row_ids)
         new_pager = model.pager.with(
