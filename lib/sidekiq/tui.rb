@@ -14,7 +14,7 @@ Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
 
 module Sidekiq
   module TUI
-    class KeyBinding < Data.define(:key, :semantic, :display_key, :description, :help); end
+    class KeyBinding < Data.define(:key, :envelope, :display_key, :description, :help); end
   end
 end
 

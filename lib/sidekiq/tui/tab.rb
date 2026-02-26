@@ -18,9 +18,9 @@ module Sidekiq
           register_table_bindings
         end
 
-        def map(semantic, key, description, help)
+        def map(envelope, key, description, help)
           display_key = key.to_s.delete_prefix('shift_')
-          @key_bindings << KeyBinding.new(key: key.to_sym, semantic:, display_key:, description:, help:)
+          @key_bindings << KeyBinding.new(key: key.to_sym, envelope:, display_key:, description:, help:)
         end
 
         def key_bindings = @key_bindings.freeze

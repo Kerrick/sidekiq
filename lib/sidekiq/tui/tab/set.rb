@@ -29,13 +29,13 @@ module Sidekiq
         end
 
         module SetClassMethods
-          def set_actions(**action_map)
+          def envelopes(**action_map)
             tab_name = name.split('::').last.downcase.to_sym
             set_class_name = "Sidekiq::#{name.split('::').last}Set"
 
             intercept_instances_of Table::ActionRequested, lambda { |message, model|
-              action_name = action_map[message.action] || message.action
-              [model, AlterSetRows.new(set_class_name:, ids: message.ids, action_name:, tab: tab_name)]
+              method_name = action_map[message.action] || message.action
+              [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name:, tab: tab_name)]
             }
           end
 

@@ -10,13 +10,13 @@ module Sidekiq
       }
 
       ESC_BINDING = KeyBinding.new(
-        key: nil, semantic: nil, display_key: 'Esc', description: 'Close', help: 'Close'
+        key: nil, envelope: nil, display_key: 'Esc', description: 'Close', help: 'Close'
       )
 
       COMMON_BINDINGS = [
-        KeyBinding.new(key: nil, semantic: nil, display_key: '?', description: 'Help', help: 'Help'),
-        KeyBinding.new(key: nil, semantic: nil, display_key: '←/→', description: 'Select Tab', help: 'Move between tabs'),
-        KeyBinding.new(key: nil, semantic: nil, display_key: 'q', description: 'Quit', help: 'Quit')
+        KeyBinding.new(key: nil, envelope: nil, display_key: '?', description: 'Help', help: 'Help'),
+        KeyBinding.new(key: nil, envelope: nil, display_key: '←/→', description: 'Select Tab', help: 'Move between tabs'),
+        KeyBinding.new(key: nil, envelope: nil, display_key: 'q', description: 'Quit', help: 'Quit')
       ].freeze
 
       AllBindings = lambda {

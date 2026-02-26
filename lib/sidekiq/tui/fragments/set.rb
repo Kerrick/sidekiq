@@ -16,7 +16,7 @@ module Sidekiq
     # Shared sorted-set fragment, nested inside each set tab.
     # Handles pagination, table rendering, and selection.
     # Filtering is delegated to Filter.
-    # Parent tabs forward semantic data messages with `as: :data_received`
+    # Parent tabs forward data messages with `as: :data_received`
     # and intercept bubbles for domain-specific dispatch.
     module Set
       include Rooibos::Router
