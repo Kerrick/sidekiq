@@ -6,12 +6,12 @@ module Sidekiq
     # Parent tabs compose via `route :table, to: Table` and
     # `otherwise route_to: :table`. Navigation events are handled by
     # the table's Router; everything else is wrapped with the current
-    # selection and bubbled outward as `ActionRequested`.
+    # selection and bubbled outward as `Request`.
     module Table
       include Rooibos::Router
 
       # Bubbled outward when the table receives a message it doesn't handle.
-      class ActionRequested < Data.define(:envelope, :ids)
+      class Request < Data.define(:envelope, :ids)
         include Rooibos::Message::Predicates
       end
 
@@ -60,11 +60,11 @@ module Sidekiq
 
       # Anything the table doesn't handle as navigation gets wrapped
       # with the current selection and bubbled outward. The parent
-      # intercepts ActionRequested and dispatches domain-specific commands.
+      # intercepts Request and dispatches domain-specific commands.
       #
-      # Guard: skip our own ActionRequested — the outward flow shares the
+      # Guard: skip our own Request — the outward flow shares the
       # same receives registry, so receive_all would re-catch our bubbles.
-      NotOwnBubble = ->(message, _) { !message.is_a?(ActionRequested) }
+      NotOwnBubble = ->(message, _) { !message.is_a?(Request) }
 
       receive NotOwnBubble, lambda { |message, model|
         ids = model.target_ids
@@ -72,7 +72,7 @@ module Sidekiq
 
         envelope = message.respond_to?(:envelope) ? message.envelope : message
         DebugLogger.info("Table receive_all: message=#{message.class} envelope=#{envelope}")
-        [model, Rooibos::Command.bubble(ActionRequested.new(envelope:, ids:))]
+        [model, Rooibos::Command.bubble(Request.new(envelope:, ids:))]
       }
 
       receive_routed :deselect, lambda { |message, model|

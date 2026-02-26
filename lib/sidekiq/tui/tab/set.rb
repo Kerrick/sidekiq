@@ -5,7 +5,7 @@ module Sidekiq
     module Tab
       # Mixin for sorted-set tabs (Scheduled, Retry, Dead). Including this
       # includes Tab, then wires routing/forwarding/intercepts by convention.
-      # Only the envelope mapping (envelopes) is tab-specific.
+      # Only the entry method mapping (entry_methods) is tab-specific.
       module Set
         def self.included(base)
           base.include Tab
@@ -36,12 +36,12 @@ module Sidekiq
         end
 
         module SetClassMethods
-          def envelopes(**action_map)
+          def entry_methods(**method_map)
             tab_name = name.split('::').last.downcase.to_sym
             set_class_name = "Sidekiq::#{name.split('::').last}Set"
 
-            intercept_instances_of Table::ActionRequested, lambda { |message, model|
-              method_name = action_map[message.envelope] || message.envelope
+            intercept_instances_of Table::Request, lambda { |message, model|
+              method_name = method_map[message.envelope] || message.envelope
               [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name:, tab: tab_name)]
             }
           end

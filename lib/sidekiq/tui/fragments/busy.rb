@@ -44,8 +44,8 @@ module Sidekiq
         )
       }
 
-      intercept_instances_of Table::ActionRequested, lambda { |message, model|
-        DebugLogger.info("Busy HandleAction: envelope=#{message.envelope} ids=#{message.ids.inspect}")
+      intercept_instances_of Table::Request, lambda { |message, model|
+        DebugLogger.info("Busy Request: envelope=#{message.envelope} ids=#{message.ids.inspect}")
         case message.envelope
         when :terminate
           [model, SignalProcess.new(identities: message.ids, signal: :terminate, tab: :busy)]

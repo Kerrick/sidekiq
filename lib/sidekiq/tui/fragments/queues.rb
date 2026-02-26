@@ -23,8 +23,8 @@ module Sidekiq
         )
       }
 
-      intercept_instances_of Table::ActionRequested, lambda { |message, model|
-        DebugLogger.info("Queues HandleAction: envelope=#{message.envelope} ids=#{message.ids.inspect}")
+      intercept_instances_of Table::Request, lambda { |message, model|
+        DebugLogger.info("Queues Request: envelope=#{message.envelope} ids=#{message.ids.inspect}")
         case message.envelope
         when :delete_queue
           [model, ClearQueue.new(queue_names: message.ids, tab: :queues)]
