@@ -34,7 +34,7 @@ class TestScheduledView < Minitest::Test
   end
 
   def loaded_model
-    set_model = Sidekiq::TUI::Set::Init[tab_name: :scheduled]
+    set_model = Sidekiq::TUI::SetContent::Init[tab_name: :scheduled]
     loaded_set = set_model.with(
       loading: false,
       pager: set_model.pager.with(current_page: 12, total: 345, next_page: 13, page: 12, size: 25),

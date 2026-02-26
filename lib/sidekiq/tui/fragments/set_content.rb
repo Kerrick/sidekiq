@@ -2,23 +2,12 @@
 
 module Sidekiq
   module TUI
-    class PagerState < Data.define(:page, :size, :current_page, :total, :next_page)
-      def has_prev? = page > 1
-      def has_next? = !next_page.nil?
-
-      EMPTY = Ractor.make_shareable(
-        new(page: 1, size: 25, current_page: 1, total: 0, next_page: nil)
-      )
-    end
-
-
-
     # Shared sorted-set fragment, nested inside each set tab.
     # Handles pagination, table rendering, and selection.
     # Filtering is delegated to Filter.
     # Parent tabs forward data messages with `as: :data_received`
     # and intercept bubbles for domain-specific dispatch.
-    module Set
+    module SetContent
       include Rooibos::Router
 
       # Bubbled when pagination changes — parent intercepts and issues tab-specific fetch.
@@ -66,12 +55,6 @@ module Sidekiq
       }
       receive_routed :data_received, ApplyData
 
-      observe_routed :rows_altered, lambda { |_, model|
-        Rooibos::Command.bubble(
-          FetchRequested.new(envelope: :set, filter: model.filter_model.text,
-                             pager_page: model.pager.page, pager_size: model.pager.size)
-        )
-      }
       forward_routed :rows_altered, to: :table, as: :deselect
 
       # --- Filter intercepts ---
@@ -136,6 +119,15 @@ module Sidekiq
                             widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
                                      tui.constraint_length(30), tui.constraint_fill(1)]]
       }
+    end
+
+    class PagerState < Data.define(:page, :size, :current_page, :total, :next_page)
+      def has_prev? = page > 1
+      def has_next? = !next_page.nil?
+
+      EMPTY = Ractor.make_shareable(
+        new(page: 1, size: 25, current_page: 1, total: 0, next_page: nil)
+      )
     end
   end
 end
