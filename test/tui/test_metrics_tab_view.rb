@@ -25,7 +25,7 @@ class TestMetricsView < Minitest::Test
   def loaded_model
     # MetricsFetched datasets are plain hashes with :name and :data keys
     datasets = [
-      { name: "HardWorker", data: Array.new(60) { |i| [i, 10] } }
+      {name: "HardWorker", data: Array.new(60) { |i| [i, 10] }}
     ]
     init = Sidekiq::TUI::Metrics::Init[].first
     init.with(loading: false, datasets: datasets, starts_at: "16:00", ends_at: "17:00")

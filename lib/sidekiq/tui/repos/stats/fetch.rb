@@ -25,13 +25,13 @@ module Sidekiq
           )
           redis_url = begin
             Sidekiq.redis { |conn| conn.config.server_url }
-          rescue StandardError
-            'N/A'
+          rescue
+            "N/A"
           end
           out.put(Ractor.make_shareable(Fetched.new(stats:, redis_url:)))
-        rescue StandardError => e
+        rescue => e
           out.put(Ractor.make_shareable(DataFetchError.new(error_message: e.message,
-                                                           backtrace: e.backtrace&.first(10))))
+            backtrace: e.backtrace&.first(10))))
         end
       end
     end

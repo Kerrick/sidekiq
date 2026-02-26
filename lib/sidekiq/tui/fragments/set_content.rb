@@ -66,7 +66,7 @@ module Sidekiq
         new_model = model.with(table: new_table)
         [new_model, Rooibos::Command.bubble(
           FetchRequested.new(envelope: :set, filter: message.text,
-                             pager_page: 1, pager_size: new_model.pager.size)
+            pager_page: 1, pager_size: new_model.pager.size)
         )]
       }
 
@@ -80,7 +80,7 @@ module Sidekiq
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
           FetchRequested.new(envelope: :set, filter: model.filter_model.text,
-                             pager_page: new_model.pager.page, pager_size: new_model.pager.size)
+            pager_page: new_model.pager.page, pager_size: new_model.pager.size)
         )]
       }
 
@@ -92,7 +92,7 @@ module Sidekiq
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
           FetchRequested.new(envelope: :set, filter: model.filter_model.text,
-                             pager_page: new_model.pager.page, pager_size: new_model.pager.size)
+            pager_page: new_model.pager.page, pager_size: new_model.pager.size)
         )]
       }
 
@@ -104,20 +104,20 @@ module Sidekiq
       # --- View ---
 
       View = lambda { |model, tui|
-        filter_state = { filter: model.filter_model.text, filtering: model.filter_model.active }
+        filter_state = {filter: model.filter_model.text, filtering: model.filter_model.active}
         rows = model.rows.map.with_index do |entry, idx|
           tui.table_row(
-            cells: [model.table.selected?(entry[:id]) ? '✅' : '',
-                    entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
+            cells: [model.table.selected?(entry[:id]) ? "✅" : "",
+              entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
             style: idx.even? ? nil : Styles::ALT_ROW
           )
         end
         Table::View[model.table, tui,
-                            title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
-                            filter_state: filter_state, loading: model.loading,
-                            header: ['☑️', 'When', 'Queue', 'Job', 'Arguments'],
-                            widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
-                                     tui.constraint_length(30), tui.constraint_fill(1)]]
+          title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
+          filter_state: filter_state, loading: model.loading,
+          header: ["☑️", "When", "Queue", "Job", "Arguments"],
+          widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
+            tui.constraint_length(30), tui.constraint_fill(1)]]
       }
     end
 

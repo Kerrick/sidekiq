@@ -22,9 +22,9 @@ module Sidekiq
             Record.new(name: qs.name, size: qs.size, latency: qs.latency.round(2), paused: pro && qs.paused?)
           end
           out.put(Ractor.make_shareable(Fetched.new(queues:, pro:)))
-        rescue StandardError => e
+        rescue => e
           out.put(Ractor.make_shareable(DataFetchError.new(error_message: e.message,
-                                                           backtrace: e.backtrace&.first(10))))
+            backtrace: e.backtrace&.first(10))))
         end
       end
     end

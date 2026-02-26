@@ -10,11 +10,9 @@ module Sidekiq
       Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_refresh_at)
 
       Init = lambda {
-        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: '', ends_at: '', metrics_refresh_at: nil)
+        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: "", ends_at: "", metrics_refresh_at: nil)
         [model, Metrics::Fetch.new]
       }
-
-
 
       View = lambda { |model, tui|
         tui.layout(
@@ -28,7 +26,7 @@ module Sidekiq
         case message
         in Metrics::Fetched
           model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
-                     ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
+            ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
         else
           model
         end
@@ -40,16 +38,16 @@ module Sidekiq
           actual_max = ds[:data].map { |_x, y| y }.max || 0
           y_max = actual_max if actual_max > y_max
           tui.dataset(name: ds[:name], data: ds[:data],
-                      style: tui.style(fg: COLORS[idx % COLORS.size]),
-                      marker: :dot, graph_type: :line)
+            style: tui.style(fg: COLORS[idx % COLORS.size]),
+            marker: :dot, graph_type: :line)
         end
         y_labels = (0...5).map { |i| ((y_max * i) / 4).round.to_s }
         tui.chart(
           datasets: datasets,
           x_axis: tui.axis(bounds: [0.0, 60.0], labels: [model.starts_at.to_s, model.ends_at.to_s],
-                           style: tui.style(fg: :white)),
+            style: tui.style(fg: :white)),
           y_axis: tui.axis(bounds: [0.0, y_max.to_f], labels: y_labels, style: tui.style(fg: :white)),
-          block: tui.block(title: 'Metrics', borders: [:all])
+          block: tui.block(title: "Metrics", borders: [:all])
         )
       }
     end

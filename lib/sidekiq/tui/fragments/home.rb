@@ -51,31 +51,31 @@ module Sidekiq
         y_max = [[model.chart_deltas_processed.max || 0, model.chart_deltas_failed.max || 0].max, 5].max
         proc_data = model.chart_deltas_processed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
         fail_data = model.chart_deltas_failed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
-        beacon = Time.now.to_i.even? ? '●' : ' '
+        beacon = Time.now.to_i.even? ? "●" : " "
         tui.chart(
           datasets: [
-            tui.dataset(name: '', data: proc_data, style: tui.style(fg: :green), marker: :dot, graph_type: :line),
-            tui.dataset(name: '', data: fail_data, style: tui.style(fg: :red), marker: :dot, graph_type: :line)
+            tui.dataset(name: "", data: proc_data, style: tui.style(fg: :green), marker: :dot, graph_type: :line),
+            tui.dataset(name: "", data: fail_data, style: tui.style(fg: :red), marker: :dot, graph_type: :line)
           ],
           x_axis: tui.axis(bounds: [0.0, 49.0], labels: [], style: tui.style(fg: :white)),
           y_axis: tui.axis(bounds: [0.0, y_max.to_f],
-                           labels: (0...5).map { |i| ((y_max * i) / 4).round.to_s },
-                           style: tui.style(fg: :white)),
+            labels: (0...5).map { |i| ((y_max * i) / 4).round.to_s },
+            style: tui.style(fg: :white)),
           block: tui.block(title: "Dashboard #{beacon}", borders: [:all])
         )
       }
 
       RedisView = lambda { |model, tui|
-        keys = ['Version', 'Uptime', 'Connected Clients', 'Memory Usage', 'Peak Memory']
+        keys = ["Version", "Uptime", "Connected Clients", "Memory Usage", "Peak Memory"]
         vals = if model.loading
-                 Array.new(5, '…')
-               else
-                 [model.redis_info.version, model.redis_info.uptime_display, model.redis_info.connected_clients,
-                  model.redis_info.used_memory, model.redis_info.peak_memory]
-               end
+          Array.new(5, "…")
+        else
+          [model.redis_info.version, model.redis_info.uptime_display, model.redis_info.connected_clients,
+            model.redis_info.used_memory, model.redis_info.peak_memory]
+        end
         tui.paragraph(
-          text: [keys.map { |k| k.ljust(18) }.join('  '), vals.map { |v| v.to_s.ljust(18) }.join('  ')],
-          block: tui.block(title: 'Redis Information', borders: [:all])
+          text: [keys.map { |k| k.ljust(18) }.join("  "), vals.map { |v| v.to_s.ljust(18) }.join("  ")],
+          block: tui.block(title: "Redis Information", borders: [:all])
         )
       }
     end

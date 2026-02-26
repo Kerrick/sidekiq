@@ -10,17 +10,17 @@ module Sidekiq
   end
 end
 
-require_relative 'repos/stats'
-require_relative 'repos/redis_info'
-require_relative 'repos/busy'
-require_relative 'repos/home'
-require_relative 'repos/queues'
-require_relative 'repos/fetch_set'
-require_relative 'repos/scheduled'
-require_relative 'repos/retry'
-require_relative 'repos/dead'
-require_relative 'repos/metrics'
-require_relative 'repos/alter_set_rows'
-require_relative 'repos/clear_queue'
-require_relative 'repos/toggle_pause_queue'
-require_relative 'repos/signal_process'
+require_relative "repos/stats/fetch"
+require_relative "repos/redis_info/fetch"
+require_relative "repos/busy/fetch"
+require_relative "repos/busy/signal"
+require_relative "repos/home/fetch"
+require_relative "repos/queues/fetch"
+require_relative "repos/queues/clear"
+require_relative "repos/queues/toggle_pause"
+require_relative "repos/fetch_set"
+require_relative "repos/scheduled/fetch"
+require_relative "repos/retry/fetch"
+require_relative "repos/dead/fetch"
+require_relative "repos/metrics/fetch"
+require_relative "repos/set_rows/alter"

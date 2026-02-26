@@ -4,10 +4,11 @@ module Sidekiq
   module TUI
     module Busy
       include Tab
+
       has_table
 
-      map :terminate, :shift_T, 'Terminate', 'Terminate selected processes'
-      map :quiet,     :shift_Q, 'Quiet',     'Quiet selected processes'
+      map :terminate, :shift_T, "Terminate", "Terminate selected processes"
+      map :quiet, :shift_Q, "Quiet", "Quiet selected processes"
 
       class Model < Data.define(:loading, :table, :processes, :work_set_size)
         def total_concurrency = processes.sum(&:concurrency)
@@ -19,7 +20,7 @@ module Sidekiq
 
         def formatted_total_rss
           rss_kb = total_rss
-          return '0' if rss_kb.zero?
+          return "0" if rss_kb.zero?
 
           if rss_kb < 100_000
             "#{rss_kb} KB"
@@ -48,9 +49,9 @@ module Sidekiq
         DebugLogger.info("Busy Request: envelope=#{message.envelope} ids=#{message.ids.inspect}")
         case message.envelope
         when :terminate
-          [model, SignalProcess.new(identities: message.ids, signal: :terminate, tab: :busy)]
+          [model, Busy::Signal.new(identities: message.ids, signal: :terminate, tab: :busy)]
         when :quiet
-          [model, SignalProcess.new(identities: message.ids, signal: :quiet, tab: :busy)]
+          [model, Busy::Signal.new(identities: message.ids, signal: :quiet, tab: :busy)]
         else
           model
         end
@@ -62,21 +63,21 @@ module Sidekiq
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }
 
-      forward_instances_of ProcessSignaled, to: :table, as: :deselect
+      forward_instances_of Busy::Signaled, to: :table, as: :deselect
 
       Update = from_router
 
       StatusView = lambda { |model, tui|
         keys = %w[Processes Threads Busy Utilization RSS]
         vals = if model.loading
-                 Array.new(5, '…')
-               else
-                 [model.processes.size, model.total_concurrency, model.work_set_size,
-                  "#{model.utilization}%", model.formatted_total_rss]
-               end
+          Array.new(5, "…")
+        else
+          [model.processes.size, model.total_concurrency, model.work_set_size,
+            "#{model.utilization}%", model.formatted_total_rss]
+        end
         tui.paragraph(
-          text: [keys.map { |k| k.ljust(12) }.join('  '), vals.map { |v| v.to_s.ljust(12) }.join('  ')],
-          block: tui.block(title: 'Status', borders: [:all])
+          text: [keys.map { |k| k.ljust(12) }.join("  "), vals.map { |v| v.to_s.ljust(12) }.join("  ")],
+          block: tui.block(title: "Status", borders: [:all])
         )
       }
 
@@ -86,16 +87,16 @@ module Sidekiq
           display_name = process.name
           display_name = "#{process.name} ⭐️" if process.leader
           display_name = "#{process.name} 🛑" if process.stopping
-          cells = [table.selected?(process.identity) ? '✅' : '',
-                   display_name, process.started_at.to_s, process.formatted_rss,
-                   process.concurrency.to_s, process.busy.to_s]
+          cells = [table.selected?(process.identity) ? "✅" : "",
+            display_name, process.started_at.to_s, process.formatted_rss,
+            process.concurrency.to_s, process.busy.to_s]
           tui.table_row(cells: cells, style: idx.even? ? nil : Styles::ALT_ROW)
         end
-        Table::View[table, tui, title: 'Processes',
-                                        header: ['☑️', 'Name', 'Started', 'RSS', 'Threads', 'Busy'],
-                                        widths: [tui.constraint_length(5), tui.constraint_fill(1), tui.constraint_length(24),
-                                                 tui.constraint_length(10), tui.constraint_length(6), tui.constraint_length(6)],
-                                        rows: rows, loading: model.loading]
+        Table::View[table, tui, title: "Processes",
+          header: ["☑️", "Name", "Started", "RSS", "Threads", "Busy"],
+          widths: [tui.constraint_length(5), tui.constraint_fill(1), tui.constraint_length(24),
+            tui.constraint_length(10), tui.constraint_length(6), tui.constraint_length(6)],
+          rows: rows, loading: model.loading]
       }
     end
   end

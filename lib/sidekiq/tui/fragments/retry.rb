@@ -5,15 +5,14 @@ module Sidekiq
     module Retry
       include Tab::Set
 
+      map :delete, :shift_D, "Delete", "Delete selected entries"
+      map :retry, :shift_R, "Retry", "Retry selected entries"
+      map :kill, :shift_K, "Kill", "Kill selected entries"
+      map :start_filter, "/", "Filter", "Filter entries"
 
-      map :delete,       :shift_D, 'Delete',    'Delete selected entries'
-      map :retry,        :shift_R, 'Retry',     'Retry selected entries'
-      map :kill,         :shift_K, 'Kill',      'Kill selected entries'
-      map :start_filter, "/",      'Filter',    'Filter entries'
-
-      Model  = from_set
-      Init   = set_init
-      View   = set_view
+      Model = from_set
+      Init = set_init
+      View = set_view
       Update = from_router
     end
   end

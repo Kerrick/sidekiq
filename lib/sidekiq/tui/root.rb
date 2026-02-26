@@ -8,8 +8,8 @@ module Sidekiq
 
     TAB_ORDER = %i[home busy queues scheduled retry dead metrics].freeze
     TAB_NAMES = {
-      home: 'Home', busy: 'Busy', queues: 'Queues', scheduled: 'Scheduled',
-      retry: 'Retries', dead: 'Dead', metrics: 'Metrics'
+      home: "Home", busy: "Busy", queues: "Queues", scheduled: "Scheduled",
+      retry: "Retries", dead: "Dead", metrics: "Metrics"
     }.freeze
     SET_TABS = %i[scheduled retry dead].freeze
 
@@ -47,14 +47,14 @@ module Sidekiq
         titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
         selected_index: TAB_ORDER.index(model.active_tab),
         block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
-        divider: ' | ', highlight_style: Styles::HIGHLIGHT
+        divider: " | ", highlight_style: Styles::HIGHLIGHT
       )
       stats_view = Stats::View[model.stats, tui]
       content = if model.error
-                  ErrorView[model.error, tui]
-                else
-                  TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
-                end
+        ErrorView[model.error, tui]
+      else
+        TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
+      end
       controls = Help::ControlsView[model.help, tui]
       base = tui.layout(
         direction: :vertical,
@@ -73,7 +73,7 @@ module Sidekiq
       )]
       lines = error_bt.map { |line| tui.text_line(spans: [tui.text_span(content: line)]) }
       tui.paragraph(text: header + lines, alignment: :left,
-                    block: tui.block(title: 'Error', borders: [:all], border_style: Styles::ERR_BORDER))
+        block: tui.block(title: "Error", borders: [:all], border_style: Styles::ERR_BORDER))
     }
 
     # --- Fragment routes ---
@@ -90,7 +90,7 @@ module Sidekiq
 
     only when: ->(_, model) { model.help.expanded } do
       receive_events %i[esc ?], ->(_, model) { model.with(help: model.help.with(expanded: false)) }
-      receive_instances_of RatatuiRuby::Event, ->(_, _) { nil }
+      receive_instances_of RatatuiRuby::Event, ->(_, _) {}
     end
 
     # --- Global keys ---
@@ -108,18 +108,18 @@ module Sidekiq
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx - 1) % TAB_ORDER.size]
       new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model,
-                  help: model.help.with(active_tab: new_tab)),
-       Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
+      [model.with(:active_tab => new_tab, :error => nil, new_tab => new_tab_model,
+        :help => model.help.with(active_tab: new_tab)),
+        Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
     receive_events :right, lambda { |_, model|
       idx = TAB_ORDER.index(model.active_tab)
       new_tab = TAB_ORDER[(idx + 1) % TAB_ORDER.size]
       new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(active_tab: new_tab, error: nil, new_tab => new_tab_model,
-                  help: model.help.with(active_tab: new_tab)),
-       Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
+      [model.with(:active_tab => new_tab, :error => nil, new_tab => new_tab_model,
+        :help => model.help.with(active_tab: new_tab)),
+        Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
     # --- Timer ---
@@ -144,24 +144,24 @@ module Sidekiq
     end
     route_to :busy do
       forward_instances_of Busy::Fetched
-      forward_instances_of ProcessSignaled
+      forward_instances_of Busy::Signaled
     end
     route_to :queues do
       forward_instances_of Queues::Fetched
-      forward_instances_of QueueCleared
-      forward_instances_of QueuePauseToggled
+      forward_instances_of Queues::Cleared
+      forward_instances_of Queues::PauseToggled
     end
     route_to :scheduled do
       forward_instances_of Scheduled::Fetched
-      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :scheduled }
+      forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :scheduled }
     end
     route_to :retry do
       forward_instances_of Retry::Fetched
-      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :retry }
+      forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :retry }
     end
     route_to :dead do
       forward_instances_of Dead::Fetched
-      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :dead }
+      forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :dead }
     end
     route_to :metrics do
       forward_instances_of Metrics::Fetched
@@ -180,8 +180,8 @@ module Sidekiq
 
     only when: IsSetFiltering do
       otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
-      otherwise route_to: :retry,     when: ->(_, model) { model.active_tab == :retry }
-      otherwise route_to: :dead,      when: ->(_, model) { model.active_tab == :dead }
+      otherwise route_to: :retry, when: ->(_, model) { model.active_tab == :retry }
+      otherwise route_to: :dead, when: ->(_, model) { model.active_tab == :dead }
     end
 
     (TAB_ORDER - %i[home metrics]).each do |tab|
@@ -205,7 +205,5 @@ module Sidekiq
       tab_module = TAB_MODULES[tab]
       Rooibos::Command.batch(Stats::Fetch.new, *tab_module::Fetch.from_model(tab_model))
     }
-
-
   end
 end

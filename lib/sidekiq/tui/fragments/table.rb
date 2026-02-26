@@ -110,7 +110,7 @@ module Sidekiq
           footer << tui.text_line(spans: spans)
         end
 
-        placeholder_cells = [''] + Array.new(header.size - 1, '…')
+        placeholder_cells = [""] + Array.new(header.size - 1, "…")
         rows = [tui.table_row(cells: placeholder_cells)]
 
         tui.table(

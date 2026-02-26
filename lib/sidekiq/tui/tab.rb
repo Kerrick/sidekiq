@@ -19,7 +19,7 @@ module Sidekiq
         end
 
         def map(envelope, key, description, help)
-          display_key = key.to_s.delete_prefix('shift_')
+          display_key = key.to_s.delete_prefix("shift_")
           @key_bindings << KeyBinding.new(key: key.to_sym, envelope:, display_key:, description:, help:)
         end
 
@@ -28,15 +28,14 @@ module Sidekiq
         private
 
         def register_table_bindings
-          map :prev_page,         :h,       'Prev/Next Page', 'Use vim keys to move to prev/next page'
-          map :next_page,         :l,       'Prev/Next Page', 'Use vim keys to move to prev/next page'
-          map :row_up,            :k,       'Prev/Next Row',  'Use vim keys to move to prev/next row'
-          map :row_down,          :j,       'Prev/Next Row',  'Use vim keys to move to prev/next row'
-          map :toggle_select,     :x,       'Select',         'Select/deselect current row'
-          map :toggle_select_all, :shift_A, 'Select All',     'Select/deselect All visible rows'
+          map :prev_page, :h, "Prev/Next Page", "Use vim keys to move to prev/next page"
+          map :next_page, :l, "Prev/Next Page", "Use vim keys to move to prev/next page"
+          map :row_up, :k, "Prev/Next Row", "Use vim keys to move to prev/next row"
+          map :row_down, :j, "Prev/Next Row", "Use vim keys to move to prev/next row"
+          map :toggle_select, :x, "Select", "Select/deselect current row"
+          map :toggle_select_all, :shift_A, "Select All", "Select/deselect All visible rows"
         end
       end
     end
   end
 end
-
