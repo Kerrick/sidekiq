@@ -17,7 +17,7 @@ module Sidekiq
           DebugLogger.info("TogglePauseQueue: failed on #{queue_name}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :toggle_pause, succeeded_ids:)))
+        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: :toggle_pause, succeeded_ids:)))
       end
     end
   end

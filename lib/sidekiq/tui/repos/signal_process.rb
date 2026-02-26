@@ -18,7 +18,7 @@ module Sidekiq
           DebugLogger.info("SignalProcess: failed on #{identity}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: signal, succeeded_ids:)))
+        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: signal, succeeded_ids:)))
       end
     end
   end

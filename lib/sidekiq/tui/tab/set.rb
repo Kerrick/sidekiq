@@ -35,7 +35,8 @@ module Sidekiq
 
             intercept_instances_of Table::ActionRequested, lambda { |message, model|
               method_name = action_map[message.action] || message.action
-              [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name:, tab: tab_name)]
+              [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name:,
+                                       envelope: message.action, tab: tab_name)]
             }
           end
 

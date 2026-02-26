@@ -155,7 +155,7 @@ module Sidekiq
     NO_REFRESH_ACTIONS = %i[terminate quiet toggle_pause].freeze
 
     receive_instances_of ActionComplete, lambda { |message, model|
-      DebugLogger.info("Root ActionComplete: tab=#{message.tab} action=#{message.action} succeeded=#{message.succeeded_ids.size}")
+      DebugLogger.info("Root ActionComplete: tab=#{message.tab} envelope=#{message.envelope} succeeded=#{message.succeeded_ids.size}")
       tab = message.tab
       tab_model = model.public_send(tab)
 
@@ -172,7 +172,7 @@ module Sidekiq
                 else
                   model
                 end
-      if NO_REFRESH_ACTIONS.include?(message.action)
+      if NO_REFRESH_ACTIONS.include?(message.envelope)
         updated
       else
         [updated, FetchCommandFor[model, model.active_tab]]

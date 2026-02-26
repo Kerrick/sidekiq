@@ -2,7 +2,7 @@
 
 module Sidekiq
   module TUI
-    class AlterSetRows < Data.define(:set_class_name, :ids, :method_name, :tab)
+    class AlterSetRows < Data.define(:set_class_name, :ids, :method_name, :envelope, :tab)
       include Rooibos::Command::Custom
 
       def call(out, _token)
@@ -20,7 +20,7 @@ module Sidekiq
           DebugLogger.info("AlterSetRows: failed on #{id}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: method_name, succeeded_ids:)))
+        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope:, succeeded_ids:)))
       end
     end
   end

@@ -14,7 +14,7 @@ module Sidekiq
           DebugLogger.info("ClearQueue: failed on #{queue_name}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, action: :clear, succeeded_ids:)))
+        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: :clear, succeeded_ids:)))
       end
     end
   end
