@@ -45,8 +45,8 @@ module Sidekiq
       }
 
       intercept_instances_of Table::ActionRequested, lambda { |message, model|
-        DebugLogger.info("Busy HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
-        case message.action
+        DebugLogger.info("Busy HandleAction: envelope=#{message.envelope} ids=#{message.ids.inspect}")
+        case message.envelope
         when :terminate
           [model, SignalProcess.new(identities: message.ids, signal: :terminate, tab: :busy)]
         when :quiet
@@ -61,6 +61,8 @@ module Sidekiq
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }
+
+      forward_instances_of ProcessSignaled, to: :table, as: :deselect
 
       Update = from_router
 

@@ -11,14 +11,14 @@ module Sidekiq
       include Rooibos::Router
 
       # Bubbled outward when the table receives a message it doesn't handle.
-      class ActionRequested < Data.define(:envelope, :action, :ids)
+      class ActionRequested < Data.define(:envelope, :ids)
         include Rooibos::Message::Predicates
       end
 
       class Model < Data.define(:row_ids, :selected, :selected_row_index)
         def selected?(id) = selected.include?(id)
 
-        def action_ids
+        def target_ids
           if selected.empty?
             row_ids.empty? ? [] : [row_ids[selected_row_index]]
           else
@@ -67,12 +67,16 @@ module Sidekiq
       NotOwnBubble = ->(message, _) { !message.is_a?(ActionRequested) }
 
       receive NotOwnBubble, lambda { |message, model|
-        ids = model.action_ids
+        ids = model.target_ids
         return model if ids.empty?
 
-        action = message.respond_to?(:envelope) ? message.envelope : message
-        DebugLogger.info("Table receive_all: message=#{message.class} envelope=#{message.respond_to?(:envelope) ? message.envelope : 'N/A'} action=#{action}")
-        [model, Rooibos::Command.bubble(ActionRequested.new(envelope: :table, action:, ids:))]
+        envelope = message.respond_to?(:envelope) ? message.envelope : message
+        DebugLogger.info("Table receive_all: message=#{message.class} envelope=#{envelope}")
+        [model, Rooibos::Command.bubble(ActionRequested.new(envelope:, ids:))]
+      }
+
+      receive_routed :deselect, lambda { |message, model|
+        model.with(selected: model.selected - message.event.succeeded_ids)
       }
 
       Update = from_router

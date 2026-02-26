@@ -24,8 +24,8 @@ module Sidekiq
       }
 
       intercept_instances_of Table::ActionRequested, lambda { |message, model|
-        DebugLogger.info("Queues HandleAction: action=#{message.action} ids=#{message.ids.inspect}")
-        case message.action
+        DebugLogger.info("Queues HandleAction: envelope=#{message.envelope} ids=#{message.ids.inspect}")
+        case message.envelope
         when :delete_queue
           [model, ClearQueue.new(queue_names: message.ids, tab: :queues)]
         when :toggle_pause
@@ -39,6 +39,12 @@ module Sidekiq
         new_table = model.table.with(row_ids: message.queues.map(&:name))
         model.with(loading: false, table: new_table, queues: message.queues, pro: message.pro || false)
       }
+
+      observe_instances_of QueueCleared, lambda { |_, model|
+        Queues::Fetch.from_model(model)
+      }
+      forward_instances_of QueueCleared, to: :table, as: :deselect
+      forward_instances_of QueuePauseToggled, to: :table, as: :deselect
 
       Update = from_router
 

@@ -66,6 +66,14 @@ module Sidekiq
       }
       receive_routed :data_received, ApplyData
 
+      observe_routed :rows_altered, lambda { |_, model|
+        Rooibos::Command.bubble(
+          FetchRequested.new(envelope: :set, filter: model.filter_model.text,
+                             pager_page: model.pager.page, pager_size: model.pager.size)
+        )
+      }
+      forward_routed :rows_altered, to: :table, as: :deselect
+
       # --- Filter intercepts ---
       # When Filter signals a filter change, clear selection, reset page, and re-fetch.
 

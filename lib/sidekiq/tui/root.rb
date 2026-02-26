@@ -138,47 +138,39 @@ module Sidekiq
       model.with(stats: new_stats, help: model.help.with(redis_url: new_stats.redis_url))
     }
 
-    forward_instances_of Stats::Fetched, to: :home
-    forward_instances_of RedisInfo::Fetched, to: :home
-    forward_instances_of Busy::Fetched, to: :busy
-    forward_instances_of Queues::Fetched, to: :queues
-    forward_instances_of Scheduled::Fetched, to: :scheduled
-    forward_instances_of Retry::Fetched, to: :retry
-    forward_instances_of Dead::Fetched, to: :dead
-    forward_instances_of Metrics::Fetched, to: :metrics
+    route_to :home do
+      forward_instances_of Stats::Fetched
+      forward_instances_of RedisInfo::Fetched
+    end
+    route_to :busy do
+      forward_instances_of Busy::Fetched
+      forward_instances_of ProcessSignaled
+    end
+    route_to :queues do
+      forward_instances_of Queues::Fetched
+      forward_instances_of QueueCleared
+      forward_instances_of QueuePauseToggled
+    end
+    route_to :scheduled do
+      forward_instances_of Scheduled::Fetched
+      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :scheduled }
+    end
+    route_to :retry do
+      forward_instances_of Retry::Fetched
+      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :retry }
+    end
+    route_to :dead do
+      forward_instances_of Dead::Fetched
+      forward ->(msg, _) { msg.is_a?(SetRowsAltered) && msg.tab == :dead }
+    end
+    route_to :metrics do
+      forward_instances_of Metrics::Fetched
+    end
 
     receive_instances_of DataFetchError, lambda { |message, model|
       log("DataFetchError: #{message.error_message}", *Array(message.backtrace))
       model.with(error: message)
     }
-
-    receive_instances_of SetRowsAltered, lambda { |message, model|
-      tab_model = model.public_send(message.tab)
-      old_table = tab_model.set.table
-      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-      updated = model.with(message.tab => tab_model.with(set: tab_model.set.with(table: new_table)))
-      [updated, FetchCommandFor[model, model.active_tab]]
-    }
-
-    receive_instances_of ProcessSignaled, lambda { |message, model|
-      old_table = model.busy.table
-      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-      model.with(busy: model.busy.with(table: new_table))
-    }
-
-    receive_instances_of QueueCleared, lambda { |message, model|
-      old_table = model.queues.table
-      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-      updated = model.with(queues: model.queues.with(table: new_table))
-      [updated, FetchCommandFor[model, model.active_tab]]
-    }
-
-    receive_instances_of QueuePauseToggled, lambda { |message, model|
-      old_table = model.queues.table
-      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-      model.with(queues: model.queues.with(table: new_table))
-    }
-
 
     # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
