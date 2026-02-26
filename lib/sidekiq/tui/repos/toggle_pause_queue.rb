@@ -2,6 +2,10 @@
 
 module Sidekiq
   module TUI
+    class QueuePauseToggled < Data.define(:succeeded_ids)
+      include Rooibos::Message::Predicates
+    end
+
     class TogglePauseQueue < Data.define(:queue_names, :tab)
       include Rooibos::Command::Custom
 
@@ -17,7 +21,7 @@ module Sidekiq
           DebugLogger.info("TogglePauseQueue: failed on #{queue_name}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: :toggle_pause, succeeded_ids:)))
+        out.put(Ractor.make_shareable(QueuePauseToggled.new(succeeded_ids:)))
       end
     end
   end

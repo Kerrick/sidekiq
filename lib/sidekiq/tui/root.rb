@@ -152,31 +152,31 @@ module Sidekiq
       model.with(error: message)
     }
 
-    NO_REFRESH_ACTIONS = %i[terminate quiet toggle_pause].freeze
+    receive_instances_of SetRowsAltered, lambda { |message, model|
+      tab_model = model.public_send(message.tab)
+      old_table = tab_model.set.table
+      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+      updated = model.with(message.tab => tab_model.with(set: tab_model.set.with(table: new_table)))
+      [updated, FetchCommandFor[model, model.active_tab]]
+    }
 
-    receive_instances_of ActionComplete, lambda { |message, model|
-      DebugLogger.info("Root ActionComplete: tab=#{message.tab} envelope=#{message.envelope} succeeded=#{message.succeeded_ids.size}")
-      tab = message.tab
-      tab_model = model.public_send(tab)
+    receive_instances_of ProcessSignaled, lambda { |message, model|
+      old_table = model.busy.table
+      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+      model.with(busy: model.busy.with(table: new_table))
+    }
 
-      # Clear succeeded_ids from the nested table's selection.
-      # Set tabs (scheduled/retry/dead) have .set.table; others have .table directly.
-      updated = if tab_model.respond_to?(:set)
-                  old_table = tab_model.set.table
-                  new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-                  model.with(tab => tab_model.with(set: tab_model.set.with(table: new_table)))
-                elsif tab_model.respond_to?(:table)
-                  old_table = tab_model.table
-                  new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
-                  model.with(tab => tab_model.with(table: new_table))
-                else
-                  model
-                end
-      if NO_REFRESH_ACTIONS.include?(message.envelope)
-        updated
-      else
-        [updated, FetchCommandFor[model, model.active_tab]]
-      end
+    receive_instances_of QueueCleared, lambda { |message, model|
+      old_table = model.queues.table
+      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+      updated = model.with(queues: model.queues.with(table: new_table))
+      [updated, FetchCommandFor[model, model.active_tab]]
+    }
+
+    receive_instances_of QueuePauseToggled, lambda { |message, model|
+      old_table = model.queues.table
+      new_table = old_table.with(selected: old_table.selected - message.succeeded_ids)
+      model.with(queues: model.queues.with(table: new_table))
     }
 
 

@@ -2,11 +2,7 @@
 
 module Sidekiq
   module TUI
-    # Shared messages produced by repos — action completions and fetch errors.
-
-    class ActionComplete < Data.define(:tab, :envelope, :succeeded_ids)
-      include Rooibos::Message::Predicates
-    end
+    # Shared messages produced by repos.
 
     class DataFetchError < Data.define(:error_message, :backtrace)
       include Rooibos::Message::Predicates

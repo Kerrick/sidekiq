@@ -2,6 +2,10 @@
 
 module Sidekiq
   module TUI
+    class ProcessSignaled < Data.define(:succeeded_ids)
+      include Rooibos::Message::Predicates
+    end
+
     class SignalProcess < Data.define(:identities, :signal, :tab)
       include Rooibos::Command::Custom
 
@@ -18,7 +22,7 @@ module Sidekiq
           DebugLogger.info("SignalProcess: failed on #{identity}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: signal, succeeded_ids:)))
+        out.put(Ractor.make_shareable(ProcessSignaled.new(succeeded_ids:)))
       end
     end
   end

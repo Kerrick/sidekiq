@@ -2,6 +2,10 @@
 
 module Sidekiq
   module TUI
+    class QueueCleared < Data.define(:succeeded_ids)
+      include Rooibos::Message::Predicates
+    end
+
     class ClearQueue < Data.define(:queue_names, :tab)
       include Rooibos::Command::Custom
 
@@ -14,7 +18,7 @@ module Sidekiq
           DebugLogger.info("ClearQueue: failed on #{queue_name}: #{e.message}")
           break
         end
-        out.put(Ractor.make_shareable(ActionComplete.new(tab:, envelope: :clear, succeeded_ids:)))
+        out.put(Ractor.make_shareable(QueueCleared.new(succeeded_ids:)))
       end
     end
   end
