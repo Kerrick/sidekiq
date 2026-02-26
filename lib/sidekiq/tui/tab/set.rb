@@ -13,6 +13,8 @@ module Sidekiq
 
           fetch_class = base.const_get(:Fetch)
           fetched_class = base.const_get(:Fetched)
+          tab_name = base.name.split('::').last.downcase.to_sym
+          set_class_name = "Sidekiq::#{base.name.split('::').last}Set"
 
           base.class_eval do
             route :set, to: ::Sidekiq::TUI::SetContent
@@ -32,19 +34,14 @@ module Sidekiq
                               pager_size: model.set.pager.size)
             }
             forward_instances_of SetRowsAltered, to: :set, as: :rows_altered
+
+            intercept_instances_of Table::Request, lambda { |message, model|
+              [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name: message.envelope, tab: tab_name)]
+            }
           end
         end
 
         module SetClassMethods
-          def entry_methods(**method_map)
-            tab_name = name.split('::').last.downcase.to_sym
-            set_class_name = "Sidekiq::#{name.split('::').last}Set"
-
-            intercept_instances_of Table::Request, lambda { |message, model|
-              method_name = method_map[message.envelope] || message.envelope
-              [model, AlterSetRows.new(set_class_name:, ids: message.ids, method_name:, tab: tab_name)]
-            }
-          end
 
           def from_set = Data.define(:set)
 

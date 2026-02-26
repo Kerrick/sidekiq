@@ -4,10 +4,9 @@ module Sidekiq
   module TUI
     module Scheduled
       include Tab::Set
-      entry_methods delete: :delete, enqueue: :add_to_queue, kill: :kill
 
       map :delete,       :shift_D, 'Delete',  'Delete selected entries'
-      map :enqueue,      :shift_E, 'Enqueue', 'Enqueue selected entries'
+      map :add_to_queue, :shift_E, 'Enqueue', 'Enqueue selected entries'
       map :kill,         :shift_K, 'Kill',    'Kill selected entries'
       map :start_filter, "/",      'Filter',  'Filter entries'
 
