@@ -3,8 +3,8 @@
 module Sidekiq
   module TUI
     module Retry
-      include Tab
-      has_set delete: :delete, retry: :retry, kill: :kill
+      include Tab::Set
+      set_actions delete: :delete, retry: :retry, kill: :kill
 
       map :delete,       :shift_D, 'Delete',    'Delete selected entries'
       map :retry,        :shift_R, 'Retry',     'Retry selected entries'

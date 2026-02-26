@@ -3,8 +3,8 @@
 module Sidekiq
   module TUI
     module Dead
-      include Tab
-      has_set delete: :delete, enqueue: :add_to_queue
+      include Tab::Set
+      actions delete: :delete, enqueue: :add_to_queue
 
       map :delete,       :shift_D, 'Delete',  'Delete selected entries'
       map :enqueue,      :shift_E, 'Enqueue', 'Enqueue selected entries'
