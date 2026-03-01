@@ -76,6 +76,7 @@ module Sidekiq
 
     # --- Fragment routes ---
 
+    route :stats, to: Stats
     route :home, to: Home
     route :busy, to: Busy
     route :queues, to: Queues
@@ -133,13 +134,9 @@ module Sidekiq
 
     # --- Data fetch results ---
 
-    observe_instances_of Stats::Fetched, lambda { |message, model|
-      new_stats = Stats::Update[message, model.stats]
-      model.with(stats: new_stats, help: model.help.with(redis_url: new_stats.redis_url))
-    }
+    forward_instances_of Stats::Fetched, broadcast_to: [:stats, :home, :help]
 
     route_to :home do
-      forward_instances_of Stats::Fetched
       forward_instances_of RedisInfo::Fetched
     end
     route_to :busy do

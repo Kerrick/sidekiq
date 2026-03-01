@@ -3,6 +3,8 @@
 module Sidekiq
   module TUI
     module Stats
+      include Rooibos::Router
+
       Model = Data.define(:stats, :loading, :redis_url)
 
       Init = lambda {
@@ -26,14 +28,11 @@ module Sidekiq
         )
       }
 
-      Update = lambda { |message, model|
-        case message
-        in Stats::Fetched
-          model.with(stats: message.stats, loading: false, redis_url: message.redis_url)
-        else
-          model
-        end
+      receive_instances_of Stats::Fetched, lambda { |message, model|
+        model.with(stats: message.stats, loading: false, redis_url: message.redis_url)
       }
+
+      Update = from_router
     end
   end
 end
