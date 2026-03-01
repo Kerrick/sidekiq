@@ -6,7 +6,7 @@ module Sidekiq
       include Tab
 
       Model = Data.define(
-        :loading, :chart_deltas_processed, :chart_deltas_failed,
+        :loading, :beacon_on, :chart_deltas_processed, :chart_deltas_failed,
         :previous_processed, :previous_failed, :redis_info
       )
 
@@ -16,7 +16,7 @@ module Sidekiq
 
       Init = lambda {
         model = Ractor.make_shareable Model.new(
-          loading: true,
+          loading: true, beacon_on: true,
           chart_deltas_processed: Array.new(50, 0),
           chart_deltas_failed: Array.new(50, 0),
           previous_processed: 0, previous_failed: 0,
@@ -33,29 +33,30 @@ module Sidekiq
         )
       }
 
-      Update = lambda { |message, model|
-        case message
-        in Stats::Fetched
-          pd = message.stats.processed - model.previous_processed
-          fd = message.stats.failed - model.previous_failed
-          model.with(
-            chart_deltas_processed: model.chart_deltas_processed[1..] + [pd],
-            chart_deltas_failed: model.chart_deltas_failed[1..] + [fd],
-            previous_processed: message.stats.processed,
-            previous_failed: message.stats.failed
-          )
-        in RedisInfo::Fetched
-          model.with(loading: false, redis_info: message.redis_info)
-        else
-          model
-        end
+      receive_instances_of Stats::Fetched, lambda { |message, model|
+        pd = message.stats.processed - model.previous_processed
+        fd = message.stats.failed - model.previous_failed
+        model.with(
+          chart_deltas_processed: model.chart_deltas_processed[1..] + [pd],
+          chart_deltas_failed: model.chart_deltas_failed[1..] + [fd],
+          previous_processed: message.stats.processed,
+          previous_failed: message.stats.failed
+        )
       }
+
+      receive_instances_of RedisInfo::Fetched, lambda { |message, model|
+        model.with(loading: false, redis_info: message.redis_info)
+      }
+
+      receive_routed :clock, ->(_, model) { model.with(beacon_on: !model.beacon_on) }
+
+      Update = from_router
 
       ChartView = lambda { |model, tui|
         y_max = [[model.chart_deltas_processed.max || 0, model.chart_deltas_failed.max || 0].max, 5].max
         proc_data = model.chart_deltas_processed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
         fail_data = model.chart_deltas_failed.each_with_index.map { |v, i| [i.to_f, v.to_f] }
-        beacon = Time.now.to_i.even? ? "●" : " "
+        beacon = model.beacon_on ? "●" : " "
         tui.chart(
           datasets: [
             tui.dataset(name: "", data: proc_data, style: tui.style(fg: :green), marker: :dot, graph_type: :line),

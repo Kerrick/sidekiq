@@ -28,26 +28,22 @@ class TestHomeView < Minitest::Test
       connected_clients: "12", used_memory: "4.2MB", peak_memory: "8.1MB"
     )
     init = Sidekiq::TUI::Home::Init[].first
-    init.with(loading: false, redis_info: redis_info)
+    init.with(loading: false, beacon_on: false, redis_info: redis_info)
   end
 
   public
 
   def test_skeleton_state_snapshot
-    Time.stub(:now, Time.at(100)) do
-      with_test_terminal(120, 20) do
-        render_home(Sidekiq::TUI::Home::Init[].first)
-        assert_snapshots("home_tab_skeleton")
-      end
+    with_test_terminal(120, 20) do
+      render_home(Sidekiq::TUI::Home::Init[].first)
+      assert_snapshots("home_tab_skeleton")
     end
   end
 
   def test_loaded_state_snapshot
-    Time.stub(:now, Time.at(101)) do
-      with_test_terminal(120, 20) do
-        render_home(loaded_model)
-        assert_snapshots("home_tab_loaded")
-      end
+    with_test_terminal(120, 20) do
+      render_home(loaded_model)
+      assert_snapshots("home_tab_loaded")
     end
   end
 end
