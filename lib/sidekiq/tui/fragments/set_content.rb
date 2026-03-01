@@ -109,7 +109,7 @@ module Sidekiq
           )
         end
         Table::View[model.table, tui,
-          title: TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
+          title: Tabs::TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
           filter_state: filter_state, loading: model.loading,
           header: ["☑️", "When", "Queue", "Job", "Arguments"],
           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),

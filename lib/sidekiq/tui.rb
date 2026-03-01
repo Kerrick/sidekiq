@@ -43,7 +43,7 @@ module Sidekiq
     module Help
       ALL_BINDINGS = [
         ESC_BINDING,
-        *TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
+        *Tabs::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
         *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
       ].uniq(&:display_key).freeze
     end

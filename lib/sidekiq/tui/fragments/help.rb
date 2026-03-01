@@ -22,7 +22,7 @@ module Sidekiq
       ].freeze
 
       ControlsFor = lambda { |active_tab|
-        tab_module = TAB_MODULES[active_tab]
+        tab_module = Tabs::TAB_MODULES[active_tab]
         return COMMON_BINDINGS if active_tab == :home
 
         COMMON_BINDINGS + tab_module.key_bindings
