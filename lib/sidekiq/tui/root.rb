@@ -17,7 +17,7 @@ module Sidekiq
     }.freeze
 
     Model = Data.define(
-      :active_tab, :stats, :help, :error,
+      :tabs, :stats, :help, :error,
       :home, :busy, :queues, :scheduled, :retry, :dead, :metrics
     )
 
@@ -27,7 +27,7 @@ module Sidekiq
       stats_model, stats_cmd = Stats::Init[]
       help_model, _help_cmd = Help::Init[]
       model = Ractor.make_shareable Model.new(
-        active_tab: :home,
+        tabs: Tabs::Init[],
         stats: stats_model, help: help_model, error: nil,
         home: home_model,
         busy: Busy::Init[].first,
@@ -41,17 +41,12 @@ module Sidekiq
     }
 
     View = lambda { |model, tui|
-      tab_bar = tui.tabs(
-        titles: TAB_ORDER.map { |tab| TAB_NAMES[tab] },
-        selected_index: TAB_ORDER.index(model.active_tab),
-        block: tui.block(title: Sidekiq::NAME, borders: [:all], title_style: Styles::TITLE),
-        divider: " | ", highlight_style: Styles::HIGHLIGHT
-      )
+      tab_bar = Tabs::View[model.tabs, tui]
       stats_view = Stats::View[model.stats, tui]
       content = if model.error
         ErrorView[model.error, tui]
       else
-        TAB_MODULES[model.active_tab]::View[model.public_send(model.active_tab), tui]
+        TAB_MODULES[model.tabs.active_tab]::View[model.public_send(model.tabs.active_tab), tui]
       end
       controls = Help::ControlsView[model.help, tui]
       base = tui.layout(
@@ -76,6 +71,7 @@ module Sidekiq
 
     # --- Fragment routes ---
 
+    route :tabs, to: Tabs
     route :stats, to: Stats
     route :home, to: Home
     route :busy, to: Busy
@@ -104,21 +100,15 @@ module Sidekiq
       receive_events :"?", ->(_, model) { model.with(help: model.help.with(expanded: true)) }
     end
 
-    receive_events :left, lambda { |_, model|
-      idx = TAB_ORDER.index(model.active_tab)
-      new_tab = TAB_ORDER[(idx - 1) % TAB_ORDER.size]
-      new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(:active_tab => new_tab, :error => nil, new_tab => new_tab_model,
-        :help => model.help.with(active_tab: new_tab)),
-        Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
-    }
+    route_to :tabs do
+      forward_events :left, as: :prev_tab
+      forward_events :right, as: :next_tab
+    end
 
-    receive_events :right, lambda { |_, model|
-      idx = TAB_ORDER.index(model.active_tab)
-      new_tab = TAB_ORDER[(idx + 1) % TAB_ORDER.size]
+    observe_instances_of Tabs::ActiveTabChanged, lambda { |message, model|
+      new_tab = message.tab
       new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
-      [model.with(:active_tab => new_tab, :error => nil, new_tab => new_tab_model,
-        :help => model.help.with(active_tab: new_tab)),
+      [model.with(error: nil, new_tab => new_tab_model),
         Rooibos::Command.batch(Stats::Fetch.new, new_tab_cmd)]
     }
 
@@ -126,7 +116,7 @@ module Sidekiq
 
     observe_instances_of Rooibos::Message::Timer, lambda { |_, model|
       cmds = [Rooibos::Command.tick(1, :clock)]
-      cmds << FetchCommandFor[model, model.active_tab] if Time.now.to_i.even?
+      cmds << FetchCommandFor[model, model.tabs.active_tab] if Time.now.to_i.even?
       [model, Rooibos::Command.batch(*cmds)]
     }
 
@@ -172,19 +162,19 @@ module Sidekiq
     # When a set tab is filtering, forward raw events so the
     # filtering modal can capture keystrokes.
     IsSetFiltering = lambda { |_, model|
-      SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filter_model.active
+      SET_TABS.include?(model.tabs.active_tab) && model.public_send(model.tabs.active_tab).set.filter_model.active
     }
 
     only when: IsSetFiltering do
-      otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
-      otherwise route_to: :retry, when: ->(_, model) { model.active_tab == :retry }
-      otherwise route_to: :dead, when: ->(_, model) { model.active_tab == :dead }
+      otherwise route_to: :scheduled, when: ->(_, model) { model.tabs.active_tab == :scheduled }
+      otherwise route_to: :retry, when: ->(_, model) { model.tabs.active_tab == :retry }
+      otherwise route_to: :dead, when: ->(_, model) { model.tabs.active_tab == :dead }
     end
 
     (TAB_ORDER - %i[home metrics]).each do |tab|
       is_set_tab = SET_TABS.include?(tab)
       guard = ->(_, model) {
-        model.active_tab == tab && !(is_set_tab && IsSetFiltering[nil, model])
+        model.tabs.active_tab == tab && !(is_set_tab && IsSetFiltering[nil, model])
       }
       only when: guard do
         route_to tab do
@@ -198,9 +188,8 @@ module Sidekiq
     # --- Helper lambdas ---
 
     FetchCommandFor = lambda { |model, tab|
-      tab_model = model.public_send(tab)
       tab_module = TAB_MODULES[tab]
-      Rooibos::Command.batch(Stats::Fetch.new, *tab_module::Fetch.from_model(tab_model))
+      Rooibos::Command.batch(Stats::Fetch.new, *tab_module::Fetch.from_model(model.public_send(tab)))
     }
   end
 end

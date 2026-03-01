@@ -35,6 +35,7 @@ require_relative "tui/fragments/dead"
 require_relative "tui/fragments/metrics"
 require_relative "tui/fragments/stats"
 require_relative "tui/fragments/help"
+require_relative "tui/fragments/tabs"
 require_relative "tui/root"
 
 module Sidekiq
