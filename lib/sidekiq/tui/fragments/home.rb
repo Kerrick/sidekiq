@@ -10,6 +10,10 @@ module Sidekiq
         :previous_processed, :previous_failed, :redis_info
       )
 
+      module Fetch
+        def self.from_model(_model) = [RedisInfo::Fetch.new]
+      end
+
       Init = lambda {
         model = Ractor.make_shareable Model.new(
           loading: true,
@@ -18,7 +22,7 @@ module Sidekiq
           previous_processed: 0, previous_failed: 0,
           redis_info: RedisInfo::Record::EMPTY
         )
-        [model, Home::Fetch.new]
+        [model, RedisInfo::Fetch.new]
       }
 
       View = lambda { |model, tui|
