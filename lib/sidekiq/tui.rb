@@ -35,3 +35,15 @@ require_relative "tui/fragments/metrics"
 require_relative "tui/fragments/stats"
 require_relative "tui/fragments/help"
 require_relative "tui/root"
+
+module Sidekiq
+  module TUI
+    module Help
+      ALL_BINDINGS = [
+        ESC_BINDING,
+        *TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
+        *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
+      ].uniq(&:display_key).freeze
+    end
+  end
+end

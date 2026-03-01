@@ -21,12 +21,6 @@ module Sidekiq
         KeyBinding.new(key: nil, envelope: nil, display_key: "q", description: "Quit", help: "Quit")
       ].freeze
 
-      ALL_BINDINGS = [
-        ESC_BINDING,
-        *Sidekiq::TUI::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
-        *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
-      ].uniq(&:display_key).freeze
-
       ControlsFor = lambda { |active_tab|
         tab_module = TAB_MODULES[active_tab]
         return COMMON_BINDINGS if active_tab == :home
