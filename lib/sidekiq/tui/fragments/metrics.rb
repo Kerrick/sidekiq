@@ -22,15 +22,12 @@ module Sidekiq
         )
       }
 
-      Update = lambda { |message, model|
-        case message
-        in Metrics::Fetched
-          model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
-            ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
-        else
-          model
-        end
+      receive_instances_of Metrics::Fetched, lambda { |message, model|
+        model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
+          ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
       }
+
+      Update = from_router
 
       ChartView = lambda { |model, tui|
         y_max = 5

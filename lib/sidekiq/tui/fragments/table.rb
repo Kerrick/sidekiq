@@ -62,11 +62,21 @@ module Sidekiq
       # with the current selection and bubbled outward. The parent
       # intercepts Request and dispatches domain-specific commands.
       #
-      # Guard: skip our own Request — the outward flow shares the
-      # same receives registry, so receive_all would re-catch our bubbles.
-      NotOwnBubble = ->(message, _) { !message.is_a?(Request) }
+      # Guards:
+      # - Skip our own Request — the outward flow shares the same
+      #   receives registry, so this would re-catch our bubbles.
+      # - Only handle user-initiated keyboard events, not system
+      #   broadcasts (e.g. :clock). Routed messages from keyboard
+      #   forwarding wrap a RatatuiRuby::Event; broadcasts wrap
+      #   other message types (Timer, etc.).
+      UserAction = lambda { |message, _|
+        return false if message.is_a?(Request)
+        return false if message.is_a?(Rooibos::Message::Routed) && !message.event.is_a?(RatatuiRuby::Event)
 
-      receive NotOwnBubble, lambda { |message, model|
+        true
+      }
+
+      receive UserAction, lambda { |message, model|
         ids = model.target_ids
         return model if ids.empty?
 
