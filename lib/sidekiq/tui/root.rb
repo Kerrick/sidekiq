@@ -54,8 +54,8 @@ module Sidekiq
     # --- Help overlay (modal — swallows all events) ---
 
     only when: ->(_, model) { model.help.expanded } do
-      receive_events %i[esc ?], ->(_, model) { model.with(help: model.help.with(expanded: false)) }
-      receive_instances_of RatatuiRuby::Event, ->(_, _) {}
+      forward_events %i[esc ?], to: :help, as: :hide
+      otherwise route_to: :help
     end
 
     # --- Global keys ---
@@ -63,7 +63,7 @@ module Sidekiq
     action :quit, -> { Rooibos::Command.exit }
     only when: ->(_, model) { !Tabs::IsSetFiltering[nil, model.tabs] } do
       receive_events %i[q ctrl_c], :quit
-      receive_events :"?", ->(_, model) { model.with(help: model.help.with(expanded: true)) }
+      forward_events :"?", to: :help, as: :show
     end
 
     route_to :tabs do
@@ -74,6 +74,8 @@ module Sidekiq
     observe_instances_of Tabs::ActiveTabChanged, lambda { |message, model|
       [model.with(error: nil), Stats::Fetch.new]
     }
+
+    forward_instances_of Tabs::ActiveTabChanged, to: :help
 
     # --- Timer ---
 

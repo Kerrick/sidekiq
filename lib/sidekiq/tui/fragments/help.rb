@@ -78,8 +78,15 @@ module Sidekiq
       receive_routed :hide, ->(_, model) { model.with(expanded: false) }
       receive_routed :clock, ->(_, model) { model.with(current_time: Time.now.utc.to_s) }
       receive_instances_of Stats::Fetched, ->(message, model) { model.with(redis_url: message.redis_url) }
+      receive_instances_of Tabs::ActiveTabChanged, ->(message, model) { model.with(active_tab: message.tab) }
 
       Update = from_router
+
+      ALL_BINDINGS = [
+        ESC_BINDING,
+        *Tabs::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
+        *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
+      ].uniq(&:display_key).freeze
     end
   end
 end
