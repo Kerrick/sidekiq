@@ -129,7 +129,7 @@ module Sidekiq
         }
         only when: guard do
           route_to tab do
-            TAB_MODULES[tab].key_bindings.each { |c| forward_events c.key, as: c.envelope }
+            (KeyMap::TABLE + KeyMap::FOR_TAB[tab]).each { |b| forward_events b.key, as: b.envelope }
           end
         end
       end

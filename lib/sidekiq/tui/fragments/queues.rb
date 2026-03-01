@@ -7,9 +7,6 @@ module Sidekiq
 
       has_table
 
-      map :delete_queue, :shift_D, "Delete", "Delete selected queue"
-      map :toggle_pause, :p, "Pause/Unpause Queue", "Pause/Unpause Queue"
-
       Model = Data.define(:loading, :table, :queues, :pro)
       Init = lambda {
         model = Ractor.make_shareable Model.new(loading: true, table: Table::Init[], queues: [], pro: false)

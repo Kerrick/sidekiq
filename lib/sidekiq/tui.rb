@@ -19,6 +19,7 @@ module Sidekiq
 end
 
 require_relative "tui/styles"
+require_relative "tui/key_map"
 require_relative "tui/tab"
 require_relative "tui/tab/set"
 require_relative "tui/repos"

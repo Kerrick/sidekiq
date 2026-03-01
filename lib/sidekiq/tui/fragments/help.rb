@@ -5,28 +5,12 @@ module Sidekiq
     module Help
       include Rooibos::Router
 
-      Model = Data.define(:expanded, :active_tab, :redis_url, :current_time)
+      Model = Data.define(:expanded, :controls, :redis_url, :current_time)
 
       Init = lambda {
-        [Ractor.make_shareable(Model.new(expanded: false, active_tab: :home, redis_url: "N/A", current_time: Time.now.utc.to_s)), nil]
+        [Ractor.make_shareable(Model.new(expanded: false, controls: KeyMap.controls_for(:home), redis_url: "N/A", current_time: Time.now.utc.to_s)), nil]
       }
 
-      ESC_BINDING = KeyBinding.new(
-        key: nil, envelope: nil, display_key: "Esc", description: "Close", help: "Close"
-      )
-
-      COMMON_BINDINGS = [
-        KeyBinding.new(key: nil, envelope: nil, display_key: "?", description: "Help", help: "Help"),
-        KeyBinding.new(key: nil, envelope: nil, display_key: "←/→", description: "Select Tab", help: "Move between tabs"),
-        KeyBinding.new(key: nil, envelope: nil, display_key: "q", description: "Quit", help: "Quit")
-      ].freeze
-
-      ControlsFor = lambda { |active_tab|
-        tab_module = Tabs::TAB_MODULES[active_tab]
-        return COMMON_BINDINGS if active_tab == :home
-
-        COMMON_BINDINGS + tab_module.key_bindings
-      }
 
       KeyBindingsView = lambda { |bindings, tui|
         bindings.flat_map do |binding|
@@ -46,7 +30,7 @@ module Sidekiq
 
       # Controls bar — rendered by root as the bottom child of its layout.
       ControlsView = lambda { |model, tui|
-        spans = KeyBindingsView[ControlsFor[model.active_tab], tui]
+        spans = KeyBindingsView[model.controls, tui]
         tui.paragraph(
           text: [tui.text_line(spans: spans),
             tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
@@ -58,7 +42,7 @@ module Sidekiq
       # Full help overlay — hardcoded bindings matching upstream (not context-sensitive).
       ExpandedView = lambda { |_model, tui|
         text_lines = [tui.text_line(spans: ["Welcome to the Sidekiq Terminal UI"], alignment: :center)] +
-          ALL_BINDINGS.map do |binding|
+          KeyMap::ALL.map do |binding|
             tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
               tui.text_span(content: ": #{binding.help}")])
           end
@@ -78,15 +62,9 @@ module Sidekiq
       receive_routed :hide, ->(_, model) { model.with(expanded: false) }
       receive_routed :clock, ->(_, model) { model.with(current_time: Time.now.utc.to_s) }
       receive_instances_of Stats::Fetched, ->(message, model) { model.with(redis_url: message.redis_url) }
-      receive_instances_of Tabs::ActiveTabChanged, ->(message, model) { model.with(active_tab: message.tab) }
+      receive_instances_of Tabs::ActiveTabChanged, ->(message, model) { model.with(controls: KeyMap.controls_for(message.tab)) }
 
       Update = from_router
-
-      ALL_BINDINGS = [
-        ESC_BINDING,
-        *Tabs::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
-        *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
-      ].uniq(&:display_key).freeze
     end
   end
 end

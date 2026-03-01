@@ -7,9 +7,6 @@ module Sidekiq
 
       has_table
 
-      map :terminate, :shift_T, "Terminate", "Terminate selected processes"
-      map :quiet, :shift_Q, "Quiet", "Quiet selected processes"
-
       class Model < Data.define(:loading, :table, :processes, :work_set_size)
         def total_concurrency = processes.sum(&:concurrency)
         def total_rss = processes.sum(&:rss_kb)

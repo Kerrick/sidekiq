@@ -18,7 +18,6 @@ module Sidekiq
           base.class_eval do
             route :set, to: ::Sidekiq::TUI::SetContent
             otherwise route_to: :set
-            register_table_bindings
 
             forward_instances_of fetched_class, to: :set, as: :data_received
 
