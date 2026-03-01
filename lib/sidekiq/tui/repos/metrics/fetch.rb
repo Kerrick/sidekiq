@@ -12,9 +12,7 @@ module Sidekiq
 
         def self.from_model(model)
           if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
-            [new]
-          else
-            []
+            new
           end
         end
 

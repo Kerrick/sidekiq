@@ -45,20 +45,14 @@ module Sidekiq
         block: tui.block(title: "Error", borders: [:all], border_style: Styles::ERR_BORDER))
     }
 
-    # --- Fragment routes ---
-
     route :tabs, to: Tabs
     route :stats, to: Stats
     route :help, to: Help
-
-    # --- Help overlay (modal — swallows all events) ---
 
     only when: ->(_, model) { model.help.expanded } do
       forward_events %i[esc ?], to: :help, as: :hide
       otherwise route_to: :help
     end
-
-    # --- Global keys ---
 
     action :quit, -> { Rooibos::Command.exit }
     only when: ->(_, model) { !Tabs::IsSetFiltering[nil, model.tabs] } do
@@ -74,29 +68,19 @@ module Sidekiq
     observe_instances_of Tabs::ActiveTabChanged, lambda { |message, model|
       [model.with(error: nil), Stats::Fetch.new]
     }
-
     forward_instances_of Tabs::ActiveTabChanged, to: :help
-
-    # --- Timer ---
 
     observe_instances_of Rooibos::Message::Timer, lambda { |_, model|
       [model, Rooibos::Command.tick(1, :clock)]
     }
-
     forward_instances_of Rooibos::Message::Timer, broadcast: true, as: :clock
 
-    # --- Data fetch results ---
-
     forward_instances_of Stats::Fetched, broadcast_to: [:stats, :tabs, :help]
-
     receive_instances_of DataFetchError, lambda { |message, model|
       model.with(error: message)
     }
 
-    # --- Forward unhandled messages to Tabs ---
-
     otherwise route_to: :tabs
-
     Update = from_router
   end
 end

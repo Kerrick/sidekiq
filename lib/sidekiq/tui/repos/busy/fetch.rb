@@ -29,7 +29,7 @@ module Sidekiq
       class Fetch < Data.define
         include Rooibos::Command::Custom
 
-        def self.from_model(_model) = [new]
+        def self.from_model(_model) = new
 
         def call(out, _token)
           processes = []

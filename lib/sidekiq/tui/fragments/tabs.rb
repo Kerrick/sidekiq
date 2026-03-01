@@ -11,7 +11,6 @@ module Sidekiq
         retry: "Retries", dead: "Dead", metrics: "Metrics"
       }.freeze
       SET_TABS = %i[scheduled retry dead].freeze
-
       TAB_MODULES = {
         home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
         retry: Retry, dead: Dead, metrics: Metrics
@@ -56,8 +55,6 @@ module Sidekiq
         )
       }
 
-      # --- Tab switching ---
-
       SwitchTab = lambda { |direction, _, model|
         idx = TAB_ORDER.index(model.active_tab)
         new_tab = TAB_ORDER[(idx + direction) % TAB_ORDER.size]
@@ -76,10 +73,7 @@ module Sidekiq
           [model, FetchCommandFor[model, model.active_tab]]
         end
       }
-
       forward_routed :clock, broadcast: true
-
-      # --- Fragment routes ---
 
       route :home, to: Home
       route :busy, to: Busy
@@ -89,11 +83,8 @@ module Sidekiq
       route :dead, to: Dead
       route :metrics, to: Metrics
 
-      # --- Data fetch results ---
-
-      forward_instances_of Stats::Fetched, to: :home
-
       route_to :home do
+        forward_instances_of Stats::Fetched
         forward_instances_of RedisInfo::Fetched
       end
       route_to :busy do
@@ -121,8 +112,6 @@ module Sidekiq
         forward_instances_of Metrics::Fetched
       end
 
-      # --- Per-tab key forwarding ---
-
       IsSetFiltering = lambda { |_, model|
         SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filter_model.active
       }
@@ -145,11 +134,8 @@ module Sidekiq
         end
       end
 
-      # --- Helper ---
-
       FetchCommandFor = lambda { |model, tab|
-        tab_module = TAB_MODULES[tab]
-        Rooibos::Command.batch(*tab_module::Fetch.from_model(model.public_send(tab)))
+        TAB_MODULES[tab]::Fetch.from_model(model.public_send(tab))
       }
 
       Update = from_router

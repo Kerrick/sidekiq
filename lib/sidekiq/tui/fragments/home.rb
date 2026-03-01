@@ -11,7 +11,7 @@ module Sidekiq
       )
 
       module Fetch
-        def self.from_model(_model) = [RedisInfo::Fetch.new]
+        def self.from_model(_model) = RedisInfo::Fetch.new
       end
 
       Init = lambda {

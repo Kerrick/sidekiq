@@ -11,8 +11,8 @@ module Sidekiq
       include Sidekiq::Paginator
 
       def self.from_model(model)
-        [new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
-          pager_size: model.set.pager.size)]
+        new(filter: model.set.filter_model.text, pager_page: model.set.pager.page,
+          pager_size: model.set.pager.size)
       end
 
       private
