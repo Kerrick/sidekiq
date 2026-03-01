@@ -46,7 +46,6 @@ module Sidekiq
       }
 
       intercept_instances_of Table::Request, lambda { |message, model|
-        DebugLogger.info("Busy Request: envelope=#{message.envelope} ids=#{message.ids.inspect}")
         case message.envelope
         when :terminate
           [model, Busy::Signal.new(identities: message.ids, signal: :terminate, tab: :busy)]
@@ -58,7 +57,6 @@ module Sidekiq
       }
 
       receive_instances_of Busy::Fetched, lambda { |message, model|
-        DebugLogger.info("Busy Fetched: #{message.processes.size} processes")
         new_table = model.table.with(row_ids: message.processes.map(&:identity))
         model.with(loading: false, table: new_table, processes: message.processes, work_set_size: message.work_set_size)
       }

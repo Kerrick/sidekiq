@@ -19,9 +19,6 @@ module Sidekiq
             when :terminate then process.stop!
             end
             succeeded_ids << identity
-          rescue => e
-            DebugLogger.info("Busy::Signal: failed on #{identity}: #{e.message}")
-            break
           end
           out.put(Ractor.make_shareable(Signaled.new(succeeded_ids:)))
         end

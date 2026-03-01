@@ -71,7 +71,6 @@ module Sidekiq
         return model if ids.empty?
 
         envelope = message.respond_to?(:envelope) ? message.envelope : message
-        DebugLogger.info("Table receive_all: message=#{message.class} envelope=#{envelope}")
         [model, Rooibos::Command.bubble(Request.new(envelope:, ids:))]
       }
 

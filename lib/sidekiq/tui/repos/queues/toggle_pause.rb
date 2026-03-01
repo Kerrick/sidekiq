@@ -18,9 +18,6 @@ module Sidekiq
             queue = Sidekiq::Queue.new(queue_name)
             queue.paused? ? queue.unpause! : queue.pause!
             succeeded_ids << queue_name
-          rescue => e
-            DebugLogger.info("Queues::TogglePause: failed on #{queue_name}: #{e.message}")
-            break
           end
           out.put(Ractor.make_shareable(PauseToggled.new(succeeded_ids:)))
         end

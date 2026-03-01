@@ -35,8 +35,3 @@ require_relative "tui/fragments/metrics"
 require_relative "tui/fragments/stats"
 require_relative "tui/fragments/help"
 require_relative "tui/root"
-
-DebugLogger = Logger.new("tui.log")
-def log(*x)
-  x.each { |item| DebugLogger.info { item } }
-end

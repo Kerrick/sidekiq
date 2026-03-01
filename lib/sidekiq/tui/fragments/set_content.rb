@@ -45,7 +45,6 @@ module Sidekiq
 
       ApplyData = lambda { |message, model|
         data = message.event # the original Scheduled::Fetched / Retry::Fetched / Dead::Fetched
-        DebugLogger.info("Set ApplyData: event_class=#{data.class} row_ids=#{data.row_ids.size}")
         new_table = model.table.with(row_ids: data.row_ids)
         new_pager = model.pager.with(
           current_page: data.current_page, total: data.total,
@@ -61,7 +60,6 @@ module Sidekiq
       # When Filter signals a filter change, clear selection, reset page, and re-fetch.
 
       intercept_instances_of Filter::FilterChanged, lambda { |message, model|
-        DebugLogger.info("Set FilterChanged: text=#{message.text}")
         new_table = model.table.with(selected: [])
         new_model = model.with(table: new_table)
         [new_model, Rooibos::Command.bubble(
@@ -75,7 +73,6 @@ module Sidekiq
       PrevPage = lambda { |_, model|
         return model unless model.pager.has_prev?
 
-        DebugLogger.info("Set PrevPage: page=#{model.pager.page - 1}")
         new_pager = model.pager.with(page: model.pager.page - 1)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(
@@ -87,7 +84,6 @@ module Sidekiq
       NextPage = lambda { |_, model|
         return model unless model.pager.has_next?
 
-        DebugLogger.info("Set NextPage: page=#{model.pager.next_page}")
         new_pager = model.pager.with(page: model.pager.next_page)
         new_model = model.with(pager: new_pager)
         [new_model, Rooibos::Command.bubble(

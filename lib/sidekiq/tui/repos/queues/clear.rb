@@ -15,9 +15,6 @@ module Sidekiq
           queue_names.each do |queue_name|
             Sidekiq::Queue.new(queue_name).clear
             succeeded_ids << queue_name
-          rescue => e
-            DebugLogger.info("Queues::Clear: failed on #{queue_name}: #{e.message}")
-            break
           end
           out.put(Ractor.make_shareable(Cleared.new(succeeded_ids:)))
         end
