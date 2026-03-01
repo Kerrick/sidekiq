@@ -4,8 +4,6 @@ module Sidekiq
   module TUI
     include Rooibos::Router
 
-    REFRESH_INTERVAL = 2.0
-
     TAB_ORDER = %i[home busy queues scheduled retry dead metrics].freeze
     TAB_NAMES = {
       home: "Home", busy: "Busy", queues: "Queues", scheduled: "Scheduled",
@@ -24,7 +22,7 @@ module Sidekiq
     )
 
     Init = lambda {
-      tick = Rooibos::Command.tick(REFRESH_INTERVAL, :refresh)
+      tick = Rooibos::Command.tick(1, :clock)
       home_model, home_cmd = Home::Init[]
       stats_model, stats_cmd = Stats::Init[]
       help_model, _help_cmd = Help::Init[]
@@ -85,6 +83,7 @@ module Sidekiq
     route :retry, to: Retry
     route :dead, to: Dead
     route :metrics, to: Metrics
+    route :help, to: Help
 
     # --- Help overlay (modal — swallows all events) ---
 
@@ -124,12 +123,13 @@ module Sidekiq
 
     # --- Timer ---
 
-    receive_routed :refresh, lambda { |_, model|
-      [model, Rooibos::Command.batch(
-        FetchCommandFor[model, model.active_tab],
-        Rooibos::Command.tick(REFRESH_INTERVAL, :refresh)
-      )]
+    observe_instances_of Rooibos::Message::Timer, lambda { |_, model|
+      cmds = [Rooibos::Command.tick(1, :clock)]
+      cmds << FetchCommandFor[model, model.active_tab] if Time.now.to_i.even?
+      [model, Rooibos::Command.batch(*cmds)]
     }
+
+    forward_instances_of Rooibos::Message::Timer, broadcast: true, as: :clock
 
     # --- Data fetch results ---
 

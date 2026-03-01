@@ -3,10 +3,12 @@
 module Sidekiq
   module TUI
     module Help
-      Model = Data.define(:expanded, :active_tab, :redis_url)
+      include Rooibos::Router
+
+      Model = Data.define(:expanded, :active_tab, :redis_url, :current_time)
 
       Init = lambda {
-        [Ractor.make_shareable(Model.new(expanded: false, active_tab: :home, redis_url: "N/A")), nil]
+        [Ractor.make_shareable(Model.new(expanded: false, active_tab: :home, redis_url: "N/A", current_time: Time.now.utc.to_s)), nil]
       }
 
       ESC_BINDING = KeyBinding.new(
@@ -19,13 +21,11 @@ module Sidekiq
         KeyBinding.new(key: nil, envelope: nil, display_key: "q", description: "Quit", help: "Quit")
       ].freeze
 
-      AllBindings = lambda {
-        @all_bindings ||= [
-          ESC_BINDING,
-          *Sidekiq::TUI::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
-          *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
-        ].uniq(&:display_key).freeze
-      }
+      ALL_BINDINGS = [
+        ESC_BINDING,
+        *Sidekiq::TUI::TAB_MODULES.values.flat_map(&:key_bindings).uniq(&:display_key),
+        *COMMON_BINDINGS.reject { |b| b.display_key == "?" }
+      ].uniq(&:display_key).freeze
 
       ControlsFor = lambda { |active_tab|
         tab_module = TAB_MODULES[active_tab]
@@ -56,7 +56,7 @@ module Sidekiq
         tui.paragraph(
           text: [tui.text_line(spans: spans),
             tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
-              tui.text_span(content: "Current Time: #{Time.now.utc}")])],
+              tui.text_span(content: "Current Time: #{model.current_time}")])],
           block: tui.block(title: "Controls", borders: [:all])
         )
       }
@@ -64,7 +64,7 @@ module Sidekiq
       # Full help overlay — hardcoded bindings matching upstream (not context-sensitive).
       ExpandedView = lambda { |_model, tui|
         text_lines = [tui.text_line(spans: ["Welcome to the Sidekiq Terminal UI"], alignment: :center)] +
-          AllBindings[].map do |binding|
+          ALL_BINDINGS.map do |binding|
             tui.text_line(spans: [tui.text_span(content: binding.display_key, style: Styles::HOTKEY),
               tui.text_span(content: ": #{binding.help}")])
           end
@@ -80,12 +80,13 @@ module Sidekiq
           children: [content, ctrl])
       }
 
-      Update = lambda { |message, model|
-        case message
-        in :toggle then model.with(expanded: !model.expanded)
-        else model
-        end
-      }
+      receive_routed :show, ->(_, model) { model.with(expanded: true) }
+      receive_routed :hide, ->(_, model) { model.with(expanded: false) }
+      receive_routed :clock, ->(_, model) { model.with(current_time: Time.now.utc.to_s) }
+      receive_instances_of Stats::Fetched, ->(message, model) { model.with(redis_url: message.redis_url) }
+
+      Update = from_router
     end
   end
 end
+
