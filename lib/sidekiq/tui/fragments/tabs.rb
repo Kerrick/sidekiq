@@ -10,6 +10,7 @@ module Sidekiq
         home: "Home", busy: "Busy", queues: "Queues", scheduled: "Scheduled",
         retry: "Retries", dead: "Dead", metrics: "Metrics"
       }.freeze
+      TABLE_TABS = %i[busy queues scheduled retry dead].freeze
       SET_TABS = %i[scheduled retry dead].freeze
       TAB_MODULES = {
         home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
@@ -26,7 +27,7 @@ module Sidekiq
       )
 
       Init = lambda {
-        home_model, home_cmd = Home::Init[]
+        home_model, home_command = Home::Init[]
         model = Ractor.make_shareable Model.new(
           active_tab: :home,
           home: home_model,
@@ -37,7 +38,7 @@ module Sidekiq
           dead: Dead::Init[].first,
           metrics: Metrics::Init[].first
         )
-        [model, home_cmd]
+        [model, home_command]
       }
 
       View = lambda { |model, tui, stats_slot|
@@ -55,88 +56,67 @@ module Sidekiq
         )
       }
 
-      SwitchTab = lambda { |direction, _, model|
-        idx = TAB_ORDER.index(model.active_tab)
-        new_tab = TAB_ORDER[(idx + direction) % TAB_ORDER.size]
-        new_tab_model, new_tab_cmd = TAB_MODULES[new_tab]::Init[]
+      SwitchTab = lambda { |index_delta, _, model|
+        index = TAB_ORDER.index(model.active_tab)
+        new_tab = TAB_ORDER[(index + index_delta) % TAB_ORDER.size]
+        new_tab_model, new_tab_command = TAB_MODULES[new_tab]::Init[]
         [model.with(active_tab: new_tab, new_tab => new_tab_model),
           Rooibos::Command.batch(
             Rooibos::Command.bubble(ActiveTabChanged.new(tab: new_tab)),
-            new_tab_cmd)]
+            new_tab_command)]
       }
-
       receive_routed :prev_tab, SwitchTab.curry[-1]
       receive_routed :next_tab, SwitchTab.curry[1]
 
       observe_routed :clock, lambda { |_, model|
         if Time.now.to_i.even?
-          [model, FetchCommandFor[model, model.active_tab]]
+          tab = model.active_tab
+          command = TAB_MODULES[tab]::Fetch.from_model(model.public_send(tab))
+          [model, command]
         end
       }
       forward_routed :clock, broadcast: true
 
-      route :home, to: Home
-      route :busy, to: Busy
-      route :queues, to: Queues
-      route :scheduled, to: Scheduled
-      route :retry, to: Retry
-      route :dead, to: Dead
-      route :metrics, to: Metrics
-
-      route_to :home do
-        forward_instances_of Stats::Fetched
-        forward_instances_of RedisInfo::Fetched
+      TAB_MESSAGES = {
+        home:      [Stats::Fetched, RedisInfo::Fetched],
+        busy:      [Busy::Fetched, Busy::Signaled],
+        queues:    [Queues::Fetched, Queues::Cleared, Queues::PauseToggled],
+        scheduled: [Scheduled::Fetched],
+        retry:     [Retry::Fetched],
+        dead:      [Dead::Fetched],
+        metrics:   [Metrics::Fetched]
+      }.freeze
+      TAB_MESSAGES.keys.each { |tab| route tab, to: TAB_MODULES[tab] }
+      TAB_MESSAGES.each do |tab, message_classes|
+        route_to tab do
+          message_classes.each { |c| forward_instances_of c }
+        end
       end
-      route_to :busy do
-        forward_instances_of Busy::Fetched
-        forward_instances_of Busy::Signaled
-      end
-      route_to :queues do
-        forward_instances_of Queues::Fetched
-        forward_instances_of Queues::Cleared
-        forward_instances_of Queues::PauseToggled
-      end
-      route_to :scheduled do
-        forward_instances_of Scheduled::Fetched
-        forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :scheduled }
-      end
-      route_to :retry do
-        forward_instances_of Retry::Fetched
-        forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :retry }
-      end
-      route_to :dead do
-        forward_instances_of Dead::Fetched
-        forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == :dead }
-      end
-      route_to :metrics do
-        forward_instances_of Metrics::Fetched
+      SET_TABS.each do |tab|
+        forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == tab }, to: tab
       end
 
       IsSetFiltering = lambda { |_, model|
-        SET_TABS.include?(model.active_tab) && model.public_send(model.active_tab).set.filter_model.active
+        SET_TABS.include?(model.active_tab) &&
+          model.public_send(model.active_tab).filtering?
       }
-
       only when: IsSetFiltering do
-        otherwise route_to: :scheduled, when: ->(_, model) { model.active_tab == :scheduled }
-        otherwise route_to: :retry, when: ->(_, model) { model.active_tab == :retry }
-        otherwise route_to: :dead, when: ->(_, model) { model.active_tab == :dead }
+        SET_TABS.each do |tab|
+          otherwise route_to: tab, when: ->(_, model) { model.active_tab == tab }
+        end
       end
 
-      (TAB_ORDER - %i[home metrics]).each do |tab|
+      TABLE_TABS.each do |tab|
         is_set_tab = SET_TABS.include?(tab)
-        guard = ->(_, model) {
+        is_active_and_accepts_keys = ->(_, model) {
           model.active_tab == tab && !(is_set_tab && IsSetFiltering[nil, model])
         }
-        only when: guard do
+        only when: is_active_and_accepts_keys do
           route_to tab do
             (KeyMap::TABLE + KeyMap::FOR_TAB[tab]).each { |b| forward_events b.key, as: b.envelope }
           end
         end
       end
-
-      FetchCommandFor = lambda { |model, tab|
-        TAB_MODULES[tab]::Fetch.from_model(model.public_send(tab))
-      }
 
       Update = from_router
     end

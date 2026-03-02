@@ -40,7 +40,11 @@ module Sidekiq
         end
 
         module SetClassMethods
-          def from_set = Data.define(:set)
+          def from_set
+            Data.define(:set) do
+              def filtering? = set.filter_model.active
+            end
+          end
 
           def set_init
             tab_name = name.split("::").last.downcase.to_sym
