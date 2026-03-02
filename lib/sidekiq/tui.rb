@@ -21,7 +21,7 @@ end
 require_relative "tui/styles"
 require_relative "tui/key_map"
 require_relative "tui/tab"
-require_relative "tui/tab/set"
+require_relative "tui/tab/sorted_set"
 require_relative "tui/repos"
 require_relative "tui/fragments/table"
 require_relative "tui/fragments/home"

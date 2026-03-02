@@ -3,11 +3,12 @@
 module Sidekiq
   module TUI
     module Retry
-      include Tab::Set
+      include Tab::SortedSet
+      acts_as_sorted_set
 
-      Model = from_set
-      Init = set_init
-      View = set_view
+      Model = from_sorted_set
+      Init = sorted_set_init
+      View = sorted_set_view
       Update = from_router
     end
   end

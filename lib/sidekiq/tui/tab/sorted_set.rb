@@ -4,18 +4,21 @@ module Sidekiq
   module TUI
     module Tab
       # Mixin for sorted-set tabs (Scheduled, Retry, Dead). Including this
-      # includes Tab, then wires routing/forwarding/intercepts by convention.
-      module Set
+      # includes Tab, then `acts_as_sorted_set` wires routing/forwarding/intercepts
+      # by convention.
+      module SortedSet
         def self.included(base)
           base.include Tab
-          base.extend SetClassMethods
+          base.extend SortedSetClassMethods
+        end
 
-          fetch_class = base.const_get(:Fetch)
-          fetched_class = base.const_get(:Fetched)
-          tab_name = base.name.split("::").last.downcase.to_sym
-          set_class_name = "Sidekiq::#{base.name.split("::").last}Set"
+        module SortedSetClassMethods
+          def acts_as_sorted_set
+            fetch_class = const_get(:Fetch)
+            fetched_class = const_get(:Fetched)
+            tab_name = name.split("::").last.downcase.to_sym
+            set_class_name = "Sidekiq::#{name.split("::").last}Set"
 
-          base.class_eval do
             route :set, to: ::Sidekiq::TUI::SetContent
             otherwise route_to: :set
 
@@ -37,16 +40,14 @@ module Sidekiq
               [model, SetRows::Alter.new(set_class_name:, ids: message.ids, method_name: message.envelope, tab: tab_name)]
             }
           end
-        end
 
-        module SetClassMethods
-          def from_set
+          def from_sorted_set
             Data.define(:set) do
               def filtering? = set.filter_model.active
             end
           end
 
-          def set_init
+          def sorted_set_init
             tab_name = name.split("::").last.downcase.to_sym
             fetch_class = const_get(:Fetch)
             model_class = const_get(:Model)
@@ -56,7 +57,7 @@ module Sidekiq
             }
           end
 
-          def set_view = ->(model, tui) { ::Sidekiq::TUI::SetContent::View[model.set, tui] }
+          def sorted_set_view = ->(model, tui) { ::Sidekiq::TUI::SetContent::View[model.set, tui] }
         end
       end
     end
