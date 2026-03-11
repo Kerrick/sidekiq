@@ -7,7 +7,7 @@ module Sidekiq
     Model = Data.define(:tabs, :stats, :help, :error)
 
     Init = lambda {
-      tick = Rooibos::Command.tick(1, :clock)
+      tick = Rooibos::Command.clock(1, :clock)
       tabs_model, tabs_cmd = Tabs::Init[]
       stats_model, stats_cmd = Stats::Init[]
       help_model, _help_cmd = Help::Init[]
@@ -70,10 +70,10 @@ module Sidekiq
     }
     forward_instances_of Tabs::ActiveTabChanged, to: :help
 
-    observe_instances_of Rooibos::Message::Timer, lambda { |_, model|
-      [model, Rooibos::Command.tick(1, :clock)]
+    observe_instances_of Rooibos::Message::Clock, lambda { |_, model|
+      [model, Rooibos::Command.clock(1, :clock)]
     }
-    forward_instances_of Rooibos::Message::Timer, broadcast: true, as: :clock
+    forward_instances_of Rooibos::Message::Clock, broadcast: true, as: :clock
 
     forward_instances_of Stats::Fetched, broadcast_to: [:stats, :tabs, :help]
     receive_instances_of DataFetchError, lambda { |message, model|

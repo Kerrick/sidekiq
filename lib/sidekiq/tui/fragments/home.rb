@@ -10,6 +10,7 @@ module Sidekiq
         :previous_processed, :previous_failed, :redis_info
       )
 
+      # Adapter — Home's refreshable data source is RedisInfo.
       module Fetch
         def self.from_model(_model) = RedisInfo::Fetch.new
       end

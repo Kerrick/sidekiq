@@ -11,9 +11,8 @@ module Sidekiq
         include Rooibos::Command::Custom
 
         def self.from_model(model)
-          if model.metrics_refresh_at.nil? || model.metrics_refresh_at < Time.now
-            new
-          end
+          ticks = model.metrics_ticks_until_refresh
+          new if ticks&.<=(0)
         end
 
         def call(out, _token)

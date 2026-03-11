@@ -39,8 +39,10 @@ class TestScheduledView < Minitest::Test
       loading: false,
       pager: set_model.pager.with(current_page: 12, total: 345, next_page: 13, page: 12, size: 25),
       rows: Array.new(25) { |i|
-        {id: "#{1000 + i}.0|job#{i}", at: "2026-02-22 16:#{format("%02d", i)}:00 UTC", queue: "default",
-         display_class: "HardWorker", display_args: "[#{i}]"}
+        Sidekiq::TUI::Scheduled::Record.new(
+          id: "#{1000 + i}.0|job#{i}", at: "2026-02-22 16:#{format("%02d", i)}:00 UTC", queue: "default",
+          display_class: "HardWorker", display_args: "[#{i}]"
+        )
       },
       table: set_model.table.with(row_ids: Array.new(25) { |i| "#{1000 + i}.0|job#{i}" })
     )

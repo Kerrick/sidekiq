@@ -103,8 +103,8 @@ module Sidekiq
         filter_state = {filter: model.filter_model.text, filtering: model.filter_model.active}
         rows = model.rows.map.with_index do |entry, idx|
           tui.table_row(
-            cells: [model.table.selected?(entry[:id]) ? "✅" : "",
-              entry[:at], entry[:queue], entry[:display_class], entry[:display_args]],
+            cells: [model.table.selected?(entry.id) ? "✅" : "",
+              entry.at, entry.queue, entry.display_class, entry.display_args],
             style: idx.even? ? nil : Styles::ALT_ROW
           )
         end

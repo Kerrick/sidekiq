@@ -22,14 +22,14 @@ module Sidekiq
       end
 
       Model = Data.define(
-        :active_tab,
+        :active_tab, :fetch_this_tick,
         :home, :busy, :queues, :scheduled, :retry, :dead, :metrics
       )
 
       Init = lambda {
         home_model, home_command = Home::Init[]
         model = Ractor.make_shareable Model.new(
-          active_tab: :home,
+          active_tab: :home, fetch_this_tick: false,
           home: home_model,
           busy: Busy::Init[].first,
           queues: Queues::Init[].first,
@@ -69,10 +69,13 @@ module Sidekiq
       receive_routed :next_tab, SwitchTab.curry[1]
 
       observe_routed :clock, lambda { |_, model|
-        if Time.now.to_i.even?
+        toggled = !model.fetch_this_tick
+        if toggled
           tab = model.active_tab
           command = TAB_MODULES[tab]::Fetch.from_model(model.public_send(tab))
-          [model, command]
+          [model.with(fetch_this_tick: toggled), command]
+        else
+          model.with(fetch_this_tick: toggled)
         end
       }
       forward_routed :clock, broadcast: true

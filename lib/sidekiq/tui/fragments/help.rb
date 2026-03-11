@@ -8,7 +8,7 @@ module Sidekiq
       Model = Data.define(:expanded, :controls, :redis_url, :current_time)
 
       Init = lambda {
-        [Ractor.make_shareable(Model.new(expanded: false, controls: KeyMap.controls_for(:home), redis_url: "N/A", current_time: Time.now.utc.to_s)), nil]
+        [Ractor.make_shareable(Model.new(expanded: false, controls: KeyMap.controls_for(:home), redis_url: "N/A", current_time: "…")), nil]
       }
 
 
@@ -60,7 +60,7 @@ module Sidekiq
 
       receive_routed :show, ->(_, model) { model.with(expanded: true) }
       receive_routed :hide, ->(_, model) { model.with(expanded: false) }
-      receive_routed :clock, ->(_, model) { model.with(current_time: Time.now.utc.to_s) }
+      receive_routed :clock, ->(message, model) { model.with(current_time: message.event.time.getutc.to_s) }
       receive_instances_of Stats::Fetched, ->(message, model) { model.with(redis_url: message.redis_url) }
       receive_instances_of Tabs::ActiveTabChanged, ->(message, model) { model.with(controls: KeyMap.controls_for(message.tab)) }
 

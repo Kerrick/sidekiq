@@ -7,11 +7,16 @@ module Sidekiq
 
       COLORS = %i[blue cyan yellow red green white gray].freeze
 
-      Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_refresh_at)
+      Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_ticks_until_refresh)
 
       Init = lambda {
-        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: "", ends_at: "", metrics_refresh_at: nil)
+        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: "", ends_at: "", metrics_ticks_until_refresh: nil)
         [model, Metrics::Fetch.new]
+      }
+
+      receive_routed :clock, lambda { |_, model|
+        return model if model.metrics_ticks_until_refresh.nil?
+        model.with(metrics_ticks_until_refresh: model.metrics_ticks_until_refresh - 1)
       }
 
       View = lambda { |model, tui|
@@ -24,7 +29,7 @@ module Sidekiq
 
       receive_instances_of Metrics::Fetched, lambda { |message, model|
         model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
-          ends_at: message.ends_at, metrics_refresh_at: Time.now + 60)
+          ends_at: message.ends_at, metrics_ticks_until_refresh: 60)
       }
 
       Update = from_router
