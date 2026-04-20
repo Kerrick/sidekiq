@@ -5,7 +5,7 @@ module Sidekiq
     module Metrics
       include Tab
 
-      COLORS = %i[blue cyan yellow red green white gray].freeze
+      COLORS = %i[light_blue light_cyan light_yellow light_red light_green white gray].freeze
 
       Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_ticks_until_refresh)
 

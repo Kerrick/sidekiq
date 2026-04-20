@@ -10,7 +10,7 @@ require "sidekiq/api"
 require "sidekiq/paginator"
 
 require "logger"
-Sidekiq.default_configuration.logger = Logger.new(IO::NULL)
+Sidekiq.default_configuration.logger = Logger.new("tui.log")
 
 module Sidekiq
   module TUI
