@@ -7,16 +7,30 @@ module Sidekiq
 
       COLORS = %i[light_blue light_cyan light_yellow light_red light_green white gray].freeze
 
-      Model = Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_ticks_until_refresh)
+      class Model < Data.define(:loading, :datasets, :starts_at, :ends_at, :metrics_ticks_until_refresh, :filter_model)
+        def filtering? = filter_model.focused?
+      end
 
       Init = lambda {
-        model = Ractor.make_shareable Model.new(loading: true, datasets: [], starts_at: "", ends_at: "", metrics_ticks_until_refresh: nil)
+        model = Ractor.make_shareable Model.new(
+          loading: true, datasets: [], starts_at: "", ends_at: "",
+          metrics_ticks_until_refresh: nil, filter_model: Filter::Init[]
+        )
         [model, Metrics::Fetch.new]
+      }
+
+      has_filter on_changed: ->(message, model) {
+        [model.with(metrics_ticks_until_refresh: nil), Metrics::Fetch.new(filter: message.text)]
       }
 
       receive_routed :clock, lambda { |_, model|
         return model if model.metrics_ticks_until_refresh.nil?
         model.with(metrics_ticks_until_refresh: model.metrics_ticks_until_refresh - 1)
+      }
+
+      receive_instances_of Metrics::Fetched, lambda { |message, model|
+        model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
+          ends_at: message.ends_at, metrics_ticks_until_refresh: 60)
       }
 
       View = lambda { |model, tui|
@@ -25,11 +39,6 @@ module Sidekiq
           constraints: [tui.constraint_fill(1)],
           children: [ChartView[model, tui]]
         )
-      }
-
-      receive_instances_of Metrics::Fetched, lambda { |message, model|
-        model.with(loading: false, datasets: message.datasets, starts_at: message.starts_at,
-          ends_at: message.ends_at, metrics_ticks_until_refresh: 60)
       }
 
       Update = from_router

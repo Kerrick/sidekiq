@@ -5,10 +5,14 @@ module Sidekiq
     module Help
       include Rooibos::Router
 
-      Model = Data.define(:expanded, :controls, :redis_url, :current_time)
+      Model = Data.define(:expanded, :controls, :redis_url, :current_time, :filter)
 
       Init = lambda {
-        [Ractor.make_shareable(Model.new(expanded: false, controls: KeyMap.controls_for(:home), redis_url: "N/A", current_time: "…")), nil]
+        [Ractor.make_shareable(Model.new(
+          expanded: false, controls: KeyMap.controls_for(:home),
+          redis_url: "N/A", current_time: "…",
+          filter: Filter::Init[]
+        )), nil]
       }
 
 
@@ -30,11 +34,29 @@ module Sidekiq
 
       # Controls bar — rendered by root as the bottom child of its layout.
       ControlsView = lambda { |model, tui|
-        spans = KeyBindingsView[model.controls, tui]
+        controls_per_line = 8
+        first_bindings, rest_bindings = model.controls.each_slice(controls_per_line).to_a
+        first_line = KeyBindingsView[first_bindings, tui]
+        second_line = KeyBindingsView[rest_bindings || [], tui]
+
+        lines = [
+          tui.text_line(spans: first_line),
+          tui.text_line(spans: second_line),
+          tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
+            tui.text_span(content: "Current Time: #{model.current_time}")])
+        ]
+
+        if model.filter.text
+          filter_spans = [
+            tui.text_span(content: "Filter: ", style: Styles::FILTER),
+            tui.text_span(content: model.filter.text, style: Styles::FILTER)
+          ]
+          filter_spans << tui.text_span(content: "_", style: Styles::BLINK) if model.filter.focused?
+          lines << tui.text_line(spans: filter_spans)
+        end
+
         tui.paragraph(
-          text: [tui.text_line(spans: spans),
-            tui.text_line(spans: [tui.text_span(content: "Redis: #{model.redis_url} "),
-              tui.text_span(content: "Current Time: #{model.current_time}")])],
+          text: lines,
           block: tui.block(title: "Controls", borders: [:all])
         )
       }
@@ -62,7 +84,12 @@ module Sidekiq
       receive_routed :hide, ->(_, model) { model.with(expanded: false) }
       receive_routed :clock, ->(message, model) { model.with(current_time: message.event.time.getutc.to_s) }
       receive_instances_of Stats::Fetched, ->(message, model) { model.with(redis_url: message.redis_url) }
-      receive_instances_of Tabs::ActiveTabChanged, ->(message, model) { model.with(controls: KeyMap.controls_for(message.tab)) }
+      receive_instances_of Tabs::ActiveTabChanged, ->(message, model) {
+        model.with(controls: KeyMap.controls_for(message.tab), filter: Filter::Init[])
+      }
+      receive_instances_of Tabs::FilterChanged, ->(message, model) {
+        model.with(filter: Filter::Model.new(text: message.text, :focused? => message.focused?))
+      }
 
       Update = from_router
     end

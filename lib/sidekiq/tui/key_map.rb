@@ -30,30 +30,66 @@ module Sidekiq
       KILL         = KeyBinding.new(key: :shift_K, envelope: :kill,         display_key: "K", description: "Kill",      help: "Kill selected entries")
       FILTER       = KeyBinding.new(key: :"/",     envelope: :start_filter, display_key: "/", description: "Filter",    help: "Filter entries")
 
-      # Collections
-      GLOBAL = [QUIT, HELP, PREV_TAB, NEXT_TAB].freeze
-      TABLE  = [PREV_PAGE, NEXT_PAGE, ROW_UP, ROW_DOWN, TOGGLE_SELECT, TOGGLE_SELECT_ALL].freeze
+      # Feature-based groupings
+      PAGEABLE   = [PREV_PAGE, NEXT_PAGE].freeze
+      SELECTABLE = [ROW_UP, ROW_DOWN, TOGGLE_SELECT, TOGGLE_SELECT_ALL].freeze
 
-      FOR_TAB = {
+      FEATURE_BINDINGS = {
+        pageable: PAGEABLE,
+        selectable: SELECTABLE,
+        filterable: [FILTER]
+      }.freeze
+
+      FEATURES_FOR_TAB = {
+        home: [],
+        busy: [:selectable],
+        queues: [:selectable],
+        scheduled: [:selectable, :pageable, :filterable],
+        retry: [:selectable, :pageable, :filterable],
+        dead: [:selectable, :pageable, :filterable],
+        metrics: [:filterable]
+      }.freeze
+
+      # Tab-specific bindings beyond features
+      TAB_SPECIFIC = {
         home: [],
         busy: [TERMINATE, QUIET],
         queues: [DELETE_QUEUE, TOGGLE_PAUSE],
-        scheduled: [DELETE, ADD_TO_QUEUE, KILL, FILTER],
-        retry: [DELETE, RETRY_ENTRY, KILL, FILTER],
-        dead: [DELETE, ADD_TO_QUEUE, FILTER],
+        scheduled: [DELETE, ADD_TO_QUEUE, KILL],
+        retry: [DELETE, RETRY_ENTRY, KILL],
+        dead: [DELETE, ADD_TO_QUEUE],
         metrics: []
       }.freeze
 
-      def self.controls_for(tab)
-        bindings = FOR_TAB[tab]
-        return GLOBAL if bindings.empty?
+      # Collections
+      GLOBAL = [QUIT, HELP, PREV_TAB, NEXT_TAB].freeze
 
-        (GLOBAL + bindings).freeze
+      # Display-deduplicated entries for ControlsView (one per display group).
+      DISPLAY_GLOBAL = [HELP, PREV_TAB, QUIT].freeze
+
+      DISPLAY_FEATURES = {
+        selectable: [ROW_UP, TOGGLE_SELECT, TOGGLE_SELECT_ALL],
+        pageable: [PREV_PAGE],
+        filterable: [FILTER]
+      }.freeze
+
+      def self.controls_for(tab)
+        features = FEATURES_FOR_TAB[tab]
+        feature_display = features.flat_map { |f| DISPLAY_FEATURES[f] }
+        (DISPLAY_GLOBAL + feature_display + TAB_SPECIFIC[tab]).freeze
+      end
+
+      # All active bindings for event forwarding (includes both directions of pairs).
+      def self.bindings_for(tab)
+        features = FEATURES_FOR_TAB[tab]
+        feature_bindings = features.flat_map { |f| FEATURE_BINDINGS[f] }
+        (feature_bindings + TAB_SPECIFIC[tab]).freeze
       end
 
       ALL = [
         ESC,
-        *FOR_TAB.values.flatten.uniq(&:display_key),
+        *FEATURES_FOR_TAB.values.flatten.uniq.flat_map { |f| FEATURE_BINDINGS[f] },
+        *TAB_SPECIFIC.values.flatten,
         *GLOBAL
       ].uniq(&:display_key).freeze
     end

@@ -27,7 +27,7 @@ module Sidekiq
       controls = Help::ControlsView[model.help, tui]
       base = tui.layout(
         direction: :vertical,
-        constraints: [tui.constraint_fill(1), tui.constraint_length(4)],
+        constraints: [tui.constraint_fill(1), tui.constraint_length(5)],
         children: [content, controls]
       )
       Help::View[model.help, tui, base]
@@ -55,7 +55,7 @@ module Sidekiq
     end
 
     action :quit, -> { Rooibos::Command.exit }
-    only when: ->(_, model) { !Tabs::IsSetFiltering[nil, model.tabs] } do
+    only when: ->(_, model) { !Tabs::IsFiltering[nil, model.tabs] } do
       receive_events %i[q ctrl_c], :quit
       forward_events :"?", to: :help, as: :show
     end
@@ -69,6 +69,7 @@ module Sidekiq
       [model.with(error: nil), Stats::Fetch.new]
     }
     forward_instances_of Tabs::ActiveTabChanged, to: :help
+    forward_instances_of Tabs::FilterChanged, to: :help
 
     observe_instances_of Rooibos::Message::Clock, lambda { |_, model|
       [model, Rooibos::Command.clock(1, :clock)]

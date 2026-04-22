@@ -2,8 +2,8 @@
 
 module Sidekiq
   module TUI
-    # Pure state machine for filtering in set tabs.
-    # No View — filter display is part of Table's footer.
+    # Pure state machine for filtering.
+    # No View — filter display is in the controls bar (Help::ControlsView).
     # Bubbles FilterChanged on submit (enter) or cancel (esc).
     module Filter
       include Rooibos::Router
@@ -13,25 +13,25 @@ module Sidekiq
         include Rooibos::Message::Predicates
       end
 
-      Model = Data.define(:active, :text)
-      Init = -> { Ractor.make_shareable Model.new(active: false, text: nil) }
+      Model = Data.define(:focused?, :text)
+      Init = -> { Ractor.make_shareable Model.new(:focused? => false, text: nil) }
 
       receive_routed :start_filter, lambda { |_, model|
-        model.with(active: true, text: "")
+        model.with(:focused? => true, text: "")
       }
 
-      only when: ->(_, model) { model.active } do
+      only when: ->(_, model) { model.focused? } do
         receive ->(message, _) { message.respond_to?(:text?) && message.text? && message.code.length == 1 },
           lambda { |message, model|
             model.with(text: "#{model.text}#{message.code}")
           }
         receive_events :backspace, ->(_, model) { model.with(text: (model.text || "").chop) }
         receive_events :enter, lambda { |_, model|
-          [model.with(active: false),
+          [model.with(:focused? => false),
             Rooibos::Command.bubble(FilterChanged.new(envelope: :filter, text: model.text))]
         }
         receive_events :esc, lambda { |_, model|
-          [model.with(active: false, text: nil),
+          [model.with(:focused? => false, text: nil),
             Rooibos::Command.bubble(FilterChanged.new(envelope: :filter, text: nil))]
         }
       end

@@ -10,14 +10,19 @@ module Sidekiq
         home: "Home", busy: "Busy", queues: "Queues", scheduled: "Scheduled",
         retry: "Retries", dead: "Dead", metrics: "Metrics"
       }.freeze
-      TABLE_TABS = %i[busy queues scheduled retry dead].freeze
+      TABLE_TABS = %i[busy queues scheduled retry dead metrics].freeze
       SET_TABS = %i[scheduled retry dead].freeze
+      FILTERABLE_TABS = %i[scheduled retry dead metrics].freeze
       TAB_MODULES = {
         home: Home, busy: Busy, queues: Queues, scheduled: Scheduled,
         retry: Retry, dead: Dead, metrics: Metrics
       }.freeze
 
       class ActiveTabChanged < Data.define(:tab)
+        include Rooibos::Message::Predicates
+      end
+
+      class FilterChanged < Data.define(:text, :focused?)
         include Rooibos::Message::Predicates
       end
 
@@ -99,24 +104,26 @@ module Sidekiq
         forward ->(msg, _) { msg.is_a?(SetRows::Altered) && msg.tab == tab }, to: tab
       end
 
-      IsSetFiltering = lambda { |_, model|
-        SET_TABS.include?(model.active_tab) &&
+      IsFiltering = lambda { |_, model|
+        FILTERABLE_TABS.include?(model.active_tab) &&
           model.public_send(model.active_tab).filtering?
       }
-      only when: IsSetFiltering do
-        SET_TABS.each do |tab|
+      only when: IsFiltering do
+        FILTERABLE_TABS.each do |tab|
           otherwise route_to: tab, when: ->(_, model) { model.active_tab == tab }
         end
       end
 
+      forward_instances_of FilterChanged, broadcast: true
+
       TABLE_TABS.each do |tab|
-        is_set_tab = SET_TABS.include?(tab)
+        is_filtering_tab = FILTERABLE_TABS.include?(tab)
         is_active_and_accepts_keys = ->(_, model) {
-          model.active_tab == tab && !(is_set_tab && IsSetFiltering[nil, model])
+          model.active_tab == tab && !(is_filtering_tab && IsFiltering[nil, model])
         }
         only when: is_active_and_accepts_keys do
           route_to tab do
-            (KeyMap::TABLE + KeyMap::FOR_TAB[tab]).each { |b| forward_events b.key, as: b.envelope }
+            KeyMap.bindings_for(tab).each { |b| forward_events b.key, as: b.envelope }
           end
         end
       end

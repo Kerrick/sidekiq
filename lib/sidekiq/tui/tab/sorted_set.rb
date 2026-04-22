@@ -43,7 +43,7 @@ module Sidekiq
 
           def from_sorted_set
             Data.define(:set) do
-              def filtering? = set.filter_model.active
+              def filtering? = set.filter_model.focused?
             end
           end
 

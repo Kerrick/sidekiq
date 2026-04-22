@@ -8,7 +8,7 @@ module Sidekiq
     # Parent tabs forward data messages with `as: :data_received`
     # and intercept bubbles for domain-specific dispatch.
     module SetContent
-      include Rooibos::Router
+      include Tab
 
       # Bubbled when pagination changes — parent intercepts and issues tab-specific fetch.
       class FetchRequested < Data.define(:envelope, :filter, :pager_page, :pager_size)
@@ -27,16 +27,14 @@ module Sidekiq
       # --- Nested fragments ---
 
       route :table, to: Table
-      route :filter_model, to: Filter
-
-      # Forward start_filter to Filter
-      forward_routed :start_filter, to: :filter_model, as: :start_filter
-
-      # When filtering is active, forward all unmatched events to Filter
-      # so it can capture keystrokes.
-      only when: ->(_, model) { model.filter_model.active } do
-        otherwise route_to: :filter_model
-      end
+      has_filter on_changed: ->(message, model) {
+        new_table = model.table.with(selected: [])
+        new_model = model.with(table: new_table)
+        [new_model, Rooibos::Command.bubble(
+          FetchRequested.new(envelope: :set, filter: message.text,
+            pager_page: 1, pager_size: new_model.pager.size)
+        )]
+      }
 
       # When not filtering, unmatched events go to the table for navigation/selection.
       otherwise route_to: :table
@@ -55,18 +53,6 @@ module Sidekiq
       receive_routed :data_received, ApplyData
 
       forward_routed :rows_altered, to: :table, as: :deselect
-
-      # --- Filter intercepts ---
-      # When Filter signals a filter change, clear selection, reset page, and re-fetch.
-
-      intercept_instances_of Filter::FilterChanged, lambda { |message, model|
-        new_table = model.table.with(selected: [])
-        new_model = model.with(table: new_table)
-        [new_model, Rooibos::Command.bubble(
-          FetchRequested.new(envelope: :set, filter: message.text,
-            pager_page: 1, pager_size: new_model.pager.size)
-        )]
-      }
 
       # --- Pagination (bubbles FetchRequested for parent to intercept) ---
 
@@ -100,7 +86,6 @@ module Sidekiq
       # --- View ---
 
       View = lambda { |model, tui|
-        filter_state = {filter: model.filter_model.text, filtering: model.filter_model.active}
         rows = model.rows.map.with_index do |entry, idx|
           tui.table_row(
             cells: [model.table.selected?(entry.id) ? "✅" : "",
@@ -110,7 +95,7 @@ module Sidekiq
         end
         Table::View[model.table, tui,
           title: Tabs::TAB_NAMES[model.tab_name], rows: rows, pager: model.pager,
-          filter_state: filter_state, loading: model.loading,
+          loading: model.loading,
           header: ["☑️", "When", "Queue", "Job", "Arguments"],
           widths: [tui.constraint_length(5), tui.constraint_length(24), tui.constraint_length(20),
             tui.constraint_length(30), tui.constraint_fill(1)]]

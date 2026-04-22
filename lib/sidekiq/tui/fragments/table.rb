@@ -92,31 +92,22 @@ module Sidekiq
 
       # --- View: renders table widget with configuration from parent ---
 
-      View = lambda { |model, tui, title:, header:, widths:, rows:, loading: false, pager: nil, filter_state: nil|
+      View = lambda { |model, tui, title:, header:, widths:, rows:, loading: false, pager: nil|
         if loading
-          SkeletonView[tui, title:, header:, widths:, pager:, filter_state:]
+          SkeletonView[tui, title:, header:, widths:, pager:]
         else
-          LoadedView[model, tui, title:, header:, widths:, rows:, pager:, filter_state:]
+          LoadedView[model, tui, title:, header:, widths:, rows:, pager:]
         end
       }
 
       # Skeleton view — renders placeholder … row and footer.
       # Does NOT receive model — structurally impossible to access real data.
-      SkeletonView = lambda { |tui, title:, header:, widths:, pager: nil, filter_state: nil|
+      SkeletonView = lambda { |tui, title:, header:, widths:, pager: nil|
         footer = [""]
         if pager
           footer.push("Page: #{pager.current_page}", "Count: …", "Total: …")
         else
           footer << "Count: …"
-        end
-
-        if filter_state && filter_state[:filter]
-          spans = [
-            tui.text_span(content: "Filter: ", style: Styles::FILTER),
-            tui.text_span(content: filter_state[:filter], style: Styles::FILTER)
-          ]
-          spans << tui.text_span(content: "_", style: Styles::BLINK) if filter_state[:filtering]
-          footer << tui.text_line(spans: spans)
         end
 
         placeholder_cells = [""] + Array.new(header.size - 1, "…")
@@ -136,7 +127,7 @@ module Sidekiq
       }
 
       # Loaded view — renders real data.
-      LoadedView = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil, filter_state: nil|
+      LoadedView = lambda { |model, tui, title:, header:, widths:, rows:, pager: nil|
         footer = [""]
         if pager
           footer.push("Page: #{pager.current_page}", "Count: #{model.row_ids.size}", "Total: #{pager.total}")
@@ -144,15 +135,6 @@ module Sidekiq
           footer << "Count: #{model.row_ids.size}"
         end
         footer << "Selected: #{model.selected.size}" unless model.selected.empty?
-
-        if filter_state && filter_state[:filter]
-          spans = [
-            tui.text_span(content: "Filter: ", style: Styles::FILTER),
-            tui.text_span(content: filter_state[:filter], style: Styles::FILTER)
-          ]
-          spans << tui.text_span(content: "_", style: Styles::BLINK) if filter_state[:filtering]
-          footer << tui.text_line(spans: spans)
-        end
 
         tui.table(
           rows: rows,

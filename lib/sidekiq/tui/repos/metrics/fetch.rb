@@ -7,17 +7,20 @@ module Sidekiq
         include Rooibos::Message::Predicates
       end
 
-      class Fetch < Data.define
+      class Fetch < Data.define(:filter)
         include Rooibos::Command::Custom
+
+        def initialize(filter: nil) = super
 
         def self.from_model(model)
           ticks = model.metrics_ticks_until_refresh
-          new if ticks&.<=(0)
+          new(filter: model.filter_model.text) if ticks&.<=(0)
         end
 
         def call(out, _token)
+          class_filter = filter ? Regexp.new(Regexp.escape(filter), Regexp::IGNORECASE) : nil
           query = Sidekiq::Metrics::Query.new
-          query_result = query.top_jobs(minutes: 60)
+          query_result = query.top_jobs(class_filter: class_filter, minutes: 60)
           job_results = query_result.job_results.sort_by { |(_kls, jr)| jr.totals["s"] }.last(7).reverse
 
           datasets = job_results.map do |kls, data|
